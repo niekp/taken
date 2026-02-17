@@ -11,6 +11,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   const [completedTasks, setCompletedTasks] = useState([])
   const [selectedDay, setSelectedDay] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [editTask, setEditTask] = useState(null)
   const [filter, setFilter] = useState('all')
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0)
   const swipeStart = useRef(null)
@@ -153,7 +154,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   function getIndicators() {
     return DAYS.map((_, i) => {
       const dayTasks = tasks.filter(t => t.day_of_week === i)
-      return dayTasks.length > 0 && i !== currentDayIndex
+      return dayTasks.length > 0
     })
   }
 
@@ -172,6 +173,9 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           <div className="text-center">
             <h1 className="text-3xl font-bold">Divide/Chores</h1>
             <p className="text-gray-500 text-sm">{getWeekRange()}</p>
+            {currentWeekOffset === 0 && (
+              <p className="text-emerald-600 text-sm font-medium mt-1">Vandaag: {DAY_NAMES[currentDayIndex]}</p>
+            )}
           </div>
           
           <button onClick={onTogglePresentation} className="p-2" title="Presentatie modus">
@@ -188,9 +192,12 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
             return (
               <div key={i} className="flex-1 p-4">
-                <div className={`text-center mb-2 ${isToday ? 'bg-emerald-500 text-white rounded-lg py-1' : ''}`}>
+                <div className={`text-center mb-2 relative ${isToday ? 'bg-emerald-500 text-white rounded-lg py-1' : ''}`}>
                   <p className="text-lg font-medium">{day}</p>
                   <p className="text-2xl">{formatDate(weekDates[i])}</p>
+                  {getTasksForDay(i).length > 0 && !isToday && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full"></span>
+                  )}
                 </div>
                 
                 <div className="space-y-3">
@@ -201,6 +208,10 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                       isCompleted={isTaskCompleted(task.id)}
                       onComplete={() => handleCompleteTask(task)}
                       onUncomplete={() => handleUncompleteTask(task)}
+                      onEdit={(t) => {
+                        setEditTask(t)
+                        setShowModal(true)
+                      }}
                       users={users}
                       isToday={isToday}
                       presentationMode={true}
@@ -236,6 +247,9 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         <div className="text-center">
           <h1 className="text-xl font-bold">Divide/Chores</h1>
           <p className="text-gray-500 text-sm">{getWeekRange()}</p>
+          {currentWeekOffset === 0 && (
+            <p className="text-emerald-600 text-xs font-medium mt-1">Vandaag: {DAY_NAMES[currentDayIndex]}</p>
+          )}
         </div>
         
         <button onClick={onTogglePresentation} className="p-2" title="Presentatie modus">
@@ -290,19 +304,26 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           const dayTasks = getTasksForDay(i)
           const isActive = i === activeDay
           const isToday = i === currentDayIndex && currentWeekOffset === 0
+          const hasTasks = dayTasks.length > 0
 
           return (
             <button
               key={i}
               onClick={() => setActiveDay(i)}
-              className={`flex-1 min-w-[50px] py-2 rounded-lg text-center ${
-                isActive ? 'bg-emerald-500 text-white' : 'bg-gray-100'
+              className={`flex-1 min-w-[50px] py-2 rounded-lg text-center relative ${
+                isActive 
+                  ? 'bg-emerald-500 text-white' 
+                  : isToday 
+                    ? 'bg-emerald-100 border-2 border-emerald-400' 
+                    : 'bg-gray-100'
               }`}
             >
               <p className="text-xs font-medium">{day}</p>
               <p className="text-lg">{formatDate(weekDates[i])}</p>
-              {indicators[i] && !isToday && (
-                <span className="text-orange-400 text-xs">🔔</span>
+              {hasTasks && (
+                <span className={`absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-2 h-2 rounded-full ${
+                  isActive ? 'bg-white' : 'bg-emerald-500'
+                }`}></span>
               )}
             </button>
           )
@@ -325,6 +346,10 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               isCompleted={isTaskCompleted(task.id)}
               onComplete={() => handleCompleteTask(task)}
               onUncomplete={() => handleUncompleteTask(task)}
+              onEdit={(t) => {
+                setEditTask(t)
+                setShowModal(true)
+              }}
               users={users}
               isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
               presentationMode={false}
@@ -350,15 +375,17 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
       {showModal && (
         <TaskModal
-          dayIndex={selectedDay !== null ? selectedDay : activeDay}
-          dayName={DAY_NAMES[selectedDay !== null ? selectedDay : activeDay]}
+          dayIndex={editTask?.day_of_week ?? selectedDay ?? activeDay}
+          dayName={DAY_NAMES[editTask?.day_of_week ?? selectedDay ?? activeDay]}
           onClose={() => {
             setShowModal(false)
             setSelectedDay(null)
+            setEditTask(null)
           }}
           users={users}
           currentUser={currentUser}
           onTaskCreated={loadTasks}
+          editTask={editTask}
         />
       )}
     </div>

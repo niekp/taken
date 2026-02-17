@@ -1,15 +1,24 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 const DAYS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
-export default function TaskModal({ dayIndex, dayName, onClose, users, currentUser, onTaskCreated }) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [dayOfWeek, setDayOfWeek] = useState(dayIndex)
-  const [assignedTo, setAssignedTo] = useState('both')
-  const [isRecurring, setIsRecurring] = useState(true)
+export default function TaskModal({ dayIndex, dayName, onClose, users, currentUser, onTaskCreated, editTask }) {
+  const [title, setTitle] = useState(editTask?.title || '')
+  const [description, setDescription] = useState(editTask?.description || '')
+  const [dayOfWeek, setDayOfWeek] = useState(editTask?.day_of_week ?? dayIndex)
+  const [assignedTo, setAssignedTo] = useState(() => {
+    if (editTask?.is_both) return 'both'
+    if (editTask?.assigned_to) {
+      const assignedUser = users.find(u => u.id === editTask.assigned_to)
+      return assignedUser?.name?.toLowerCase() || 'both'
+    }
+    return 'both'
+  })
+  const [isRecurring, setIsRecurring] = useState(editTask?.is_recurring ?? true)
   const [loading, setLoading] = useState(false)
+
+  const isEditing = !!editTask
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -31,17 +40,57 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
       taskAssignedTo = esther.id
     }
 
+    if (isEditing) {
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          title: title.trim(),
+          description: description.trim() || null,
+          day_of_week: dayOfWeek,
+          assigned_to: taskAssignedTo,
+          is_both: taskIsBoth,
+          is_recurring: isRecurring
+        })
+        .eq('id', editTask.id)
+
+      setLoading(false)
+
+      if (!error) {
+        onTaskCreated()
+        onClose()
+      }
+    } else {
+      const { error } = await supabase
+        .from('tasks')
+        .insert({
+          title: title.trim(),
+          description: description.trim() || null,
+          day_of_week: dayOfWeek,
+          assigned_to: taskAssignedTo,
+          is_both: taskIsBoth,
+          is_recurring: isRecurring,
+          created_by: currentUser.id
+        })
+
+      setLoading(false)
+
+      if (!error) {
+        onTaskCreated()
+        onClose()
+      }
+    }
+  }
+
+  async function handleDelete(e) {
+    e.preventDefault()
+    if (!confirm('Weet je zeker dat je deze taak wilt verwijderen?')) return
+
+    setLoading(true)
+
     const { error } = await supabase
       .from('tasks')
-      .insert({
-        title: title.trim(),
-        description: description.trim() || null,
-        day_of_week: dayOfWeek,
-        assigned_to: taskAssignedTo,
-        is_both: taskIsBoth,
-        is_recurring: isRecurring,
-        created_by: currentUser.id
-      })
+      .delete()
+      .eq('id', editTask.id)
 
     setLoading(false)
 
@@ -59,7 +108,7 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
       >
         <div className="p-4 border-b">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Taak toevoegen</h2>
+            <h2 className="text-xl font-bold">{isEditing ? 'Taak wijzigen' : 'Taak toevoegen'}</h2>
             <button onClick={onClose} className="p-2 text-gray-400">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -150,8 +199,19 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
             disabled={loading || !title.trim()}
             className="btn-primary w-full py-4 text-lg disabled:opacity-50"
           >
-            {loading ? 'Bezig...' : 'Taak toevoegen'}
+            {loading ? 'Bezig...' : isEditing ? 'Wijzigingen opslaan' : 'Taak toevoegen'}
           </button>
+
+          {isEditing && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={loading}
+              className="w-full py-3 text-red-500 font-medium disabled:opacity-50"
+            >
+              Taak verwijderen
+            </button>
+          )}
         </form>
       </div>
     </div>
