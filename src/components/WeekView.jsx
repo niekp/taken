@@ -17,6 +17,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
   const today = new Date()
   const currentDayIndex = today.getDay() === 0 ? 6 : today.getDay() - 1
+  const [activeDay, setActiveDay] = useState(currentDayIndex)
   
   function getWeekDates(offset = 0) {
     const start = new Date(today)
@@ -74,10 +75,12 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   }
 
   function isTaskCompleted(taskId) {
-    return completedTasks.some(ct => ct.task_id === taskId && ct.user_id === currentUser.id)
+    return completedTasks.some(ct => ct.task_id === taskId && ct.user_id === currentUser?.id)
   }
 
   async function handleCompleteTask(task) {
+    if (!currentUser) return
+    
     const weekNumber = getWeekNumber(weekDates[0])
     const year = weekDates[0].getFullYear()
     
@@ -113,9 +116,9 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     const diff = e.changedTouches[0].clientX - swipeStart.current
     if (Math.abs(diff) > 50) {
       if (diff > 0) {
-        setCurrentWeekOffset(prev => prev - 1)
+        setActiveDay(prev => prev > 0 ? prev - 1 : 6)
       } else {
-        setCurrentWeekOffset(prev => prev + 1)
+        setActiveDay(prev => prev < 6 ? prev + 1 : 0)
       }
     }
     swipeStart.current = null
@@ -142,14 +145,73 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
   const indicators = getIndicators()
 
+  if (presentationMode) {
+    return (
+      <div className="min-h-screen p-8">
+        <div className="flex items-center justify-between mb-8">
+          <button onClick={onOpenMenu} className="p-2">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          
+          <div className="text-center">
+            <h1 className="text-3xl font-bold">Divide/Chores</h1>
+            <p className="text-gray-500 text-sm">{getWeekRange()}</p>
+          </div>
+          
+          <button onClick={onTogglePresentation} className="p-2" title="Presentatie modus">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex gap-1">
+          {DAYS.map((day, i) => {
+            const dayTasks = getTasksForDay(i)
+            const isToday = i === currentDayIndex && currentWeekOffset === 0
+
+            return (
+              <div key={i} className="flex-1 p-4">
+                <div className={`text-center mb-2 ${isToday ? 'bg-emerald-500 text-white rounded-lg py-1' : ''}`}>
+                  <p className="text-lg font-medium">{day}</p>
+                  <p className="text-2xl">{formatDate(weekDates[i])}</p>
+                </div>
+                
+                <div className="space-y-3">
+                  {dayTasks.slice(0, 10).map(task => (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      isCompleted={isTaskCompleted(task.id)}
+                      onComplete={() => handleCompleteTask(task)}
+                      users={users}
+                      isToday={isToday}
+                      presentationMode={true}
+                    />
+                  ))}
+                  {dayTasks.length > 10 && (
+                    <p className="text-xs text-gray-400 text-center">
+                      +{dayTasks.length - 10} meer
+                    </p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div 
-      className={`min-h-screen ${presentationMode ? 'p-8' : ''}`}
+      className="min-h-screen"
       onTouchStart={handleSwipeStart}
       onTouchEnd={handleSwipeEnd}
     >
-      {/* Header */}
-      <div className={`flex items-center justify-between ${presentationMode ? 'mb-8' : 'p-4'}`}>
+      <div className="flex items-center justify-between p-4">
         <button onClick={onOpenMenu} className="p-2">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -157,7 +219,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         </button>
         
         <div className="text-center">
-          <h1 className={`font-bold ${presentationMode ? 'text-3xl' : 'text-xl'}`}>Divide/Chores</h1>
+          <h1 className="text-xl font-bold">Divide/Chores</h1>
           <p className="text-gray-500 text-sm">{getWeekRange()}</p>
         </div>
         
@@ -168,31 +230,29 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         </button>
       </div>
 
-      {/* Filter */}
-      {!presentationMode && (
-        <div className="px-4 mb-4">
-          <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
-            {['all', 'bijan', 'esther'].map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
-                  filter === f 
-                    ? 'bg-white shadow text-emerald-600' 
-                    : 'text-gray-500'
-                }`}
-              >
-                {f === 'all' ? 'Alle' : f === 'bijan' ? '👤 Bijan' : '👤 Esther'}
-              </button>
-            ))}
-          </div>
+      <div className="px-4 mb-4">
+        <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+          {['all', 'bijan', 'esther'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+                filter === f 
+                  ? 'bg-white shadow text-emerald-600' 
+                  : 'text-gray-500'
+              }`}
+            >
+              {f === 'all' ? 'Alle' : f === 'bijan' ? '👤 Bijan' : '👤 Esther'}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
-      {/* Week Navigation */}
       <div className="flex items-center justify-between px-2 mb-4">
         <button 
-          onClick={() => setCurrentWeekOffset(prev => prev - 1)}
+          onClick={() => {
+            setActiveDay(prev => prev > 0 ? prev - 1 : 6)
+          }}
           className="p-2 text-gray-500"
         >
           ←
@@ -201,84 +261,81 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           {currentWeekOffset === 0 ? 'Deze week' : currentWeekOffset > 0 ? 'Volgende weken' : 'Vorige weken'}
         </span>
         <button 
-          onClick={() => setCurrentWeekOffset(prev => prev + 1)}
+          onClick={() => {
+            setActiveDay(prev => prev < 6 ? prev + 1 : 0)
+          }}
           className="p-2 text-gray-500"
         >
           →
         </button>
       </div>
 
-      {/* Days Grid */}
-      <div className="flex gap-1 px-1 overflow-x-auto">
+      <div className="flex gap-1 px-2 overflow-x-auto mb-4">
         {DAYS.map((day, i) => {
           const dayTasks = getTasksForDay(i)
-          const hasTasks = dayTasks.length > 0
-          const completedCount = dayTasks.filter(t => isTaskCompleted(t.id)).length
+          const isActive = i === activeDay
           const isToday = i === currentDayIndex && currentWeekOffset === 0
-          const hasIndicator = indicators[i]
 
           return (
-            <div
+            <button
               key={i}
-              className={`flex-1 min-w-[80px] ${presentationMode ? 'p-4' : 'p-2'}`}
+              onClick={() => setActiveDay(i)}
+              className={`flex-1 min-w-[50px] py-2 rounded-lg text-center ${
+                isActive ? 'bg-emerald-500 text-white' : 'bg-gray-100'
+              }`}
             >
-              <div 
-                onClick={() => {
-                  setSelectedDay(i)
-                  setShowModal(true)
-                }}
-                className={`text-center mb-2 ${
-                  isToday ? 'bg-emerald-500 text-white rounded-lg py-1' : ''
-                }`}
-              >
-                <p className={`font-medium ${presentationMode ? 'text-lg' : 'text-xs'}`}>{day}</p>
-                <p className={presentationMode ? 'text-2xl' : 'text-lg'}>{formatDate(weekDates[i])}</p>
-                {hasIndicator && (
-                  <span className="text-orange-400 text-xs">🔔</span>
-                )}
-              </div>
-              
-              <div className="space-y-1">
-                {dayTasks.slice(0, presentationMode ? 10 : 3).map(task => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    isCompleted={isTaskCompleted(task.id)}
-                    onComplete={() => handleCompleteTask(task)}
-                    users={users}
-                    isToday={isToday}
-                    presentationMode={presentationMode}
-                  />
-                ))}
-                {dayTasks.length > (presentationMode ? 10 : 3) && (
-                  <p className="text-xs text-gray-400 text-center">
-                    +{dayTasks.length - (presentationMode ? 10 : 3)} meer
-                  </p>
-                )}
-              </div>
-            </div>
+              <p className="text-xs font-medium">{day}</p>
+              <p className="text-lg">{formatDate(weekDates[i])}</p>
+              {indicators[i] && !isToday && (
+                <span className="text-orange-400 text-xs">🔔</span>
+              )}
+            </button>
           )
         })}
       </div>
 
-      {/* Add Task FAB */}
-      {!presentationMode && (
-        <button
-          onClick={() => {
-            setSelectedDay(currentDayIndex)
-            setShowModal(true)
-          }}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-emerald-500 text-white rounded-full shadow-lg flex items-center justify-center text-2xl active:scale-95 transition-all"
-        >
-          +
-        </button>
-      )}
+      <div className="px-2">
+        <h2 className="text-lg font-semibold mb-3">
+          {DAY_NAMES[activeDay]}
+          {activeDay === currentDayIndex && currentWeekOffset === 0 && (
+            <span className="ml-2 text-emerald-500 text-sm">(vandaag)</span>
+          )}
+        </h2>
+        
+        <div className="space-y-2">
+          {getTasksForDay(activeDay).map(task => (
+            <TaskItem
+              key={task.id}
+              task={task}
+              isCompleted={isTaskCompleted(task.id)}
+              onComplete={() => handleCompleteTask(task)}
+              users={users}
+              isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
+              presentationMode={false}
+            />
+          ))}
+          {getTasksForDay(activeDay).length === 0 && (
+            <p className="text-gray-400 text-center py-8">
+              Geen taken voor deze dag
+            </p>
+          )}
+        </div>
+      </div>
 
-      {/* Modal */}
+      <button
+        onClick={() => {
+          setSelectedDay(activeDay)
+          setShowModal(true)
+        }}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-emerald-500 text-white rounded-full shadow-lg flex items-center justify-center text-2xl active:scale-95 transition-all"
+      >
+        +
+      </button>
+
       {showModal && (
         <TaskModal
-          dayIndex={selectedDay !== null ? selectedDay : currentDayIndex}
-          dayName={DAY_NAMES[selectedDay !== null ? selectedDay : currentDayIndex]}
+          dayIndex={selectedDay !== null ? selectedDay : activeDay}
+          dayName={DAY_NAMES[selectedDay !== null ? selectedDay : activeDay]}
           onClose={() => {
             setShowModal(false)
             setSelectedDay(null)
