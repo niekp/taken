@@ -3,19 +3,19 @@ export default function TaskItem({ task, isCompleted, onComplete, onUncomplete, 
     ? 'Samen' 
     : users.find(u => u.id === task.assigned_to)?.name || 'Niemand'
 
-  const assigneeColor = task.is_both 
-    ? 'bg-purple-100 border-purple-400'
-    : assignee === 'Bijan' 
-      ? 'bg-blue-100 border-bijan'
-      : assignee === 'Esther'
-        ? 'bg-pink-100 border-esther'
-        : 'bg-gray-100 border-gray-400'
+  const assigneeConfig = {
+    'Samen': { bg: 'bg-pastel-lavender', border: 'border-pastel-lavenderDark', text: 'text-pastel-lavenderDark' },
+    'Bijan': { bg: 'bg-brand-bijan/20', border: 'border-brand-bijan', text: 'text-brand-bijan' },
+    'Esther': { bg: 'bg-brand-esther/20', border: 'border-brand-esther', text: 'text-brand-esther' },
+  }
+
+  const config = assigneeConfig[assignee] || { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-500' }
 
   return (
     <div
       onClick={() => onEdit && onEdit(task)}
-      className={`task-card ${isCompleted ? 'opacity-60' : ''} ${presentationMode ? 'p-4 mb-3' : 'p-3 mb-2'} active:scale-[0.99] transition-transform cursor-pointer`}
-      style={{ borderLeftColor: assignee === 'Bijan' ? '#3b82f6' : assignee === 'Esther' ? '#f472b6' : task.is_both ? '#9333ea' : '#9ca3af' }}
+      className={`task-card group ${isCompleted ? 'opacity-60' : ''} ${presentationMode ? 'p-4 mb-3' : 'p-4 mb-3'}`}
+      style={{ borderLeftWidth: '3px', borderLeftColor: config.border.replace('border-', '') }}
     >
       <div className="flex items-start gap-3">
         <button
@@ -28,38 +28,37 @@ export default function TaskItem({ task, isCompleted, onComplete, onUncomplete, 
               onComplete()
             }
           }}
-          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
             isCompleted 
-              ? 'bg-emerald-500 border-emerald-500' 
-              : 'border-gray-300 hover:border-emerald-400 bg-white'
+              ? 'bg-accent-mint border-accent-mint' 
+              : 'border-gray-300 hover:border-accent-mint bg-white group-hover:shadow-soft'
           }`}
         >
           {isCompleted && (
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
             </svg>
           )}
         </button>
         
         <div className="flex-1 min-w-0">
-          <p className={`font-medium truncate ${isCompleted ? 'line-through text-gray-400' : ''} ${presentationMode ? 'text-base' : 'text-sm'}`}>
+          <p className={`font-medium truncate transition-all ${isCompleted ? 'line-through text-gray-400' : 'text-gray-700'} ${presentationMode ? 'text-base' : 'text-sm'}`}>
             {task.title}
           </p>
           {task.description && (
-            <p className={`text-gray-500 truncate ${presentationMode ? 'text-sm' : 'text-xs'}`}>
+            <p className={`text-gray-400 truncate mt-0.5 ${presentationMode ? 'text-sm' : 'text-xs'}`}>
               {task.description}
             </p>
           )}
-          {!presentationMode && (
-            <span className={`inline-block mt-1 text-xs px-1.5 py-0.5 rounded ${assigneeColor}`}>
-              {assignee}
-            </span>
-          )}
-          {presentationMode && (
-            <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded ${assigneeColor}`}>
-              {assignee}
-            </span>
-          )}
+          <span className={`inline-flex items-center mt-2 text-xs px-2.5 py-1 rounded-lg font-medium ${config.bg} ${config.text}`}>
+            {assignee}
+          </span>
+        </div>
+
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
         </div>
       </div>
     </div>

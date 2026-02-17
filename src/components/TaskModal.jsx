@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const DAYS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -100,26 +100,34 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
     }
   }
 
+  const assigneeOptions = [
+    { value: 'both', label: 'Samen', bg: 'bg-pastel-lavender', activeBg: 'bg-pastel-lavenderDark' },
+    { value: 'bijan', label: 'Bijan', bg: 'bg-brand-bijan/20', activeBg: 'bg-brand-bijan' },
+    { value: 'esther', label: 'Esther', bg: 'bg-brand-esther/20', activeBg: 'bg-brand-esther' },
+  ]
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-gray-900/30 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
       <div 
-        className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-y-auto shadow-soft-lg"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-4 border-b">
+        <div className="p-5 border-b border-gray-100">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">{isEditing ? 'Taak wijzigen' : 'Taak toevoegen'}</h2>
-            <button onClick={onClose} className="p-2 text-gray-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <h2 className="text-xl font-semibold text-gray-800">
+              {isEditing ? 'Taak wijzigen' : 'Nieuwe taak'}
+            </h2>
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Taak *</label>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Taak</label>
             <input
               type="text"
               value={title}
@@ -132,7 +140,7 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Opmerking</label>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Opmerking</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -143,52 +151,55 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Dag</label>
-            <select
-              value={dayOfWeek}
-              onChange={e => setDayOfWeek(parseInt(e.target.value))}
-              className="input-field"
-            >
+            <label className="block text-sm font-medium text-gray-600 mb-2">Dag</label>
+            <div className="grid grid-cols-7 gap-1">
               {DAYS.map((day, i) => (
-                <option key={i} value={i}>{day}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Toewijzen aan</label>
-            <div className="flex gap-2">
-              {['both', 'bijan', 'esther'].map(val => (
                 <button
-                  key={val}
+                  key={i}
                   type="button"
-                  onClick={() => setAssignedTo(val)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                    assignedTo === val
-                      ? val === 'both' 
-                        ? 'bg-purple-500 text-white'
-                        : val === 'bijan'
-                          ? 'bg-bijan text-white'
-                          : 'bg-esther text-white'
-                      : 'bg-gray-100 text-gray-600'
+                  onClick={() => setDayOfWeek(i)}
+                  className={`py-2 rounded-xl text-xs font-medium transition-all ${
+                    dayOfWeek === i
+                      ? 'bg-accent-mint text-white shadow-soft'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                   }`}
                 >
-                  {val === 'both' ? 'Samen' : val === 'bijan' ? '👤 Bijan' : '👤 Esther'}
+                  {day.slice(0, 2)}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Toewijzen aan</label>
+            <div className="flex gap-2">
+              {assigneeOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAssignedTo(opt.value)}
+                  className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
+                    assignedTo === opt.value
+                      ? `${opt.activeBg} text-white shadow-soft`
+                      : `${opt.bg} text-gray-600 hover:opacity-80`
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl">
             <button
               type="button"
               onClick={() => setIsRecurring(!isRecurring)}
-              className={`w-12 h-6 rounded-full transition-all ${
-                isRecurring ? 'bg-emerald-500' : 'bg-gray-300'
+              className={`w-12 h-7 rounded-full transition-all duration-300 ${
+                isRecurring ? 'bg-accent-mint' : 'bg-gray-300'
               }`}
             >
-              <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                isRecurring ? 'translate-x-6' : 'translate-x-0.5'
+              <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform duration-300 ${
+                isRecurring ? 'translate-x-5' : 'translate-x-0.5'
               }`} />
             </button>
             <span className="text-sm text-gray-600">Elke week herhalen</span>
@@ -197,9 +208,14 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
           <button
             type="submit"
             disabled={loading || !title.trim()}
-            className="btn-primary w-full py-4 text-lg disabled:opacity-50"
+            className="btn-primary w-full py-4 text-base flex items-center justify-center gap-2"
           >
-            {loading ? 'Bezig...' : isEditing ? 'Wijzigingen opslaan' : 'Taak toevoegen'}
+            {loading ? (
+              <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : isEditing ? 'Wijzigingen opslaan' : 'Taak toevoegen'}
           </button>
 
           {isEditing && (
@@ -207,7 +223,7 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
               type="button"
               onClick={handleDelete}
               disabled={loading}
-              className="w-full py-3 text-red-500 font-medium disabled:opacity-50"
+              className="w-full py-3 text-red-500 font-medium text-sm hover:bg-red-50 rounded-xl transition-colors"
             >
               Taak verwijderen
             </button>

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,27 +9,71 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #FDF8F3;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium transition-all active:scale-95;
+    @apply bg-accent-mint text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 active:scale-[0.97] shadow-soft hover:shadow-soft-lg;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-all active:scale-95;
+    @apply bg-pastel-cream text-gray-700 px-6 py-3 rounded-xl font-medium transition-all duration-200 active:scale-[0.97] border border-pastel-creamDark;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-gray-600 px-4 py-2 rounded-lg font-medium transition-all duration-200 active:scale-[0.97];
   }
   
   .input-field {
-    @apply w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all;
+    @apply w-full px-4 py-3.5 rounded-xl border border-pastel-creamDark bg-white focus:border-accent-mint focus:ring-4 focus:ring-pastel-mint/20 focus:outline-none transition-all duration-200;
   }
   
   .task-card {
-    @apply bg-white rounded-lg shadow-sm p-3 mb-2 border-l-4 transition-all active:scale-[0.98];
+    @apply bg-white rounded-2xl shadow-card p-4 mb-3 border border-gray-50 transition-all duration-200 active:scale-[0.99];
   }
+
+  .card {
+    @apply bg-white rounded-2xl shadow-soft p-4;
+  }
+
+  .glass {
+    @apply bg-white/80 backdrop-blur-md;
+  }
+
+  .day-tab {
+    @apply flex-1 py-3 rounded-2xl text-center text-sm font-medium transition-all duration-300;
+  }
+
+  .filter-btn {
+    @apply flex-1 py-2.5 px-3 rounded-xl text-sm font-medium transition-all duration-200;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E5E5E5;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D4D4D4;
 }

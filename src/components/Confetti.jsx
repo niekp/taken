@@ -1,46 +1,56 @@
 import { useState, useEffect } from 'react'
 
 export default function Confetti() {
-  const [showSuccess, setShowSuccess] = useState(false)
+  const [particles, setParticles] = useState([])
 
   useEffect(() => {
-    setShowSuccess(true)
-    
-    const playSound = () => {
-      try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-        const playTone = (freq, startTime, duration) => {
-          const oscillator = audioContext.createOscillator()
-          const gainNode = audioContext.createGain()
-          oscillator.connect(gainNode)
-          gainNode.connect(audioContext.destination)
-          oscillator.frequency.value = freq
-          oscillator.type = 'sine'
-          gainNode.gain.setValueAtTime(0.3, startTime)
-          gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration)
-          oscillator.start(startTime)
-          oscillator.stop(startTime + duration)
-        }
-        const now = audioContext.currentTime
-        playTone(523.25, now, 0.1)
-        playTone(659.25, now + 0.1, 0.1)
-        playTone(783.99, now + 0.2, 0.2)
-      } catch (e) {}
-    }
-    
-    playSound()
-    
-    const timeout = setTimeout(() => setShowSuccess(false), 1500)
-    return () => clearTimeout(timeout)
+    const colors = ['#B8E6D4', '#E2D4F0', '#FFDAB9', '#F8C8D4', '#C5E8F7', '#F5B895']
+    const newParticles = Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 0.5,
+      duration: 1.5 + Math.random() * 1,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: 6 + Math.random() * 8,
+      rotation: Math.random() * 360,
+    }))
+    setParticles(newParticles)
   }, [])
 
-  if (!showSuccess) return null
-
   return (
-    <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
-      <div className="text-8xl animate-bounce">
-        ✅
-      </div>
+    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute animate-confetti"
+          style={{
+            left: `${p.x}%`,
+            top: '-20px',
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            borderRadius: p.size > 8 ? '4px' : '50%',
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            transform: `rotate(${p.rotation}deg)`,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes confetti {
+          0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(100vh) rotate(720deg);
+            opacity: 0;
+          }
+        }
+        .animate-confetti {
+          animation: confetti 2s ease-out forwards;
+        }
+      `}</style>
     </div>
   )
 }
