@@ -81,7 +81,7 @@ export default function Login({ onLogin, onSelectUser, users }) {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Divide/Chores</h1>
-          <p className="text-gray-500 mt-2">Je huishouden, leuker gemaakt</p>
+          <p className="text-gray-500 mt-2">Own your chores.</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
