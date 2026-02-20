@@ -8,6 +8,8 @@ Een takenlijst app voor het huishouden van Bijan en Esther.
 
 **https://bijanamirhojat.github.io/divide-chores/**
 
+Presentatie modus: **https://bijanamirhojat.github.io/divide-chores/?mode=presentation**
+
 ---
 
 ## Technische Stack
@@ -28,8 +30,8 @@ divide-chores/
 │   ├── components/
 │   │   ├── Login.jsx       # PIN login + naam selectie
 │   │   ├── WeekView.jsx    # Hoofdscherm met week/dag view
-│   │   ├── TaskItem.jsx    # individuele taak component
-│   │   ├── TaskModal.jsx   # Modal om taken toe te voegen
+│   │   ├── TaskItem.jsx    # Individuele taak component
+│   │   ├── TaskModal.jsx   # Modal om taken/eten toe te voegen
 │   │   ├── Menu.jsx        # Menu met history
 │   │   └── Confetti.jsx    # Animatie bij afronden taak
 │   ├── lib/
@@ -43,7 +45,8 @@ divide-chores/
 ├── package.json
 ├── vite.config.js
 ├── tailwind.config.js
-└── postcss.config.js
+├── postcss.config.js
+└── .env                    # Supabase credentials (NIET committen)
 ```
 
 ---
@@ -77,9 +80,20 @@ divide-chores/
 | id | UUID | Primary key |
 | task_id | UUID | FK naar tasks.id |
 | user_id | UUID | FK naar users.id |
-| completed_at | TIMESTAMP | Wanneer voltooid |
 | week_number | INTEGER | Weeknummer |
 | year | INTEGER | Jaar |
+| completed_at | TIMESTAMP | Wanneer voltooid |
+
+### `meals` tabel
+| Kolom | Type | Beschrijving |
+|-------|------|--------------|
+| id | UUID | Primary key |
+| day_of_week | INTEGER | 0=ma, 6=zo |
+| meal_name | TEXT | Naam van het eten |
+| meal_type | TEXT | 'lunch' of 'dinner' |
+| week_number | INTEGER | Weeknummer |
+| year | INTEGER | Jaar |
+| created_at | TIMESTAMP | Created at |
 
 ---
 
@@ -95,6 +109,12 @@ npm run dev
 
 Dit start de dev server op http://localhost:5173
 
+**Let op**: Maak een `.env` bestand aan in de project root:
+```
+VITE_SUPABASE_URL=jouw_supabase_url
+VITE_SUPABASE_ANON_KEY=jouw_anon_key
+```
+
 ### Bouwen voor Productie
 
 ```bash
@@ -107,64 +127,54 @@ Dit maakt een `dist` folder die naar GitHub Pages kan worden gedeployed.
 
 ## Deployen naar GitHub Pages
 
-### Optie 1: Handmatig (aanbevolen)
-
-1. Download de project folder van GitHub
-2. Run lokaal: `npm run build`
-3. Pak de inhoud van de `dist` folder
-4. Ga naar GitHub repo > Settings > Pages
-5. Kies "Deploy from a branch" > main > /dist
-6. Klik Save
-
-### Optie 2: Automatisch (Actions)
-
 De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naar main.
 
----
-
-## Supabase Config
-
-**Project URL**: `https://beovxcpqruwxznrbtmxs.supabase.co`
-
-**Anon Key**: (zie .env bestand)
-
-### Gebruikers toevoegen via SQL
-
-
-### PIN wijzigen
-
-```sql
-UPDATE users SET pin = 'nieuwe_pin' WHERE name = 'Bijan';
-```
+**Belangrijk**: Voeg de volgende GitHub Secrets toe in repo Settings > Secrets and variables > Actions:
+- `VITE_SUPABASE_URL` - Je Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Je Supabase anon key
 
 ---
 
 ## Gebruik van de App
 
 1. Open de URL
-2. Voer PIN in: **PINCODE**
+2. Voer PIN in (zie Supabase database)
 3. Selecteer je naam (Bijan of Esther)
-4. Navigeer tussen dagen met swipe of pijltjes
-5. Tik op "+" om taak toe te voegen
-6. Tik op een taak om af te vinken (met geluid + animatie)
-7. Gebruik het menu (hamburger linksboven) voor:
+4. Navigeer tussen dagen met de pijltjes bovenin
+5. Tik op "+" om taak of eten toe te voegen
+6. Tik op een taak om af te vinken (met confetti animatie)
+7. Swipe naar links op een taak om te verwijderen
+8. Gebruik het menu (hamburger linksboven) voor:
    - Voltooide taken history
    - Presentatie modus (week view op groot scherm)
    - Uitloggen
+
+### Taak toevoegen
+1. Klik op "+"
+2. Kies "Taak" of "Eten" met de toggle bovenaan
+3. Vul de details in
+4. Optioneel: voeg tegelijk eten toe voor die dag
+
+### Eten toevoegen
+1. Klik op "+" → kies "Eten"
+2. Of voeg het toe via de taak-modal
 
 ---
 
 ## Features
 
-- ✅ Mobile-first design (1 dag tegelijk op mobiel)
+- ✅ Mobile-first design
 - ✅ Week view in presentatie modus
 - ✅ Taken toewijzen aan Bijan, Esther, of samen
-- ✅ Repeterende taken (wekelijks)
-- ✅ Geluid + animatie bij afronden taak
+- ✅ Repeterende taken (wekelijks herhalen of éénmalig)
+- ✅ Confetti animatie bij afronden taak
 - ✅ Filter op persoon
-- ✅ Indicator 🔔 bij dagen met taken (niet vandaag)
+- ✅ Indicator bij dagen met taken
 - ✅ Voltooide taken history
-- ✅ Presentatie modus voor groter scherm
+- ✅ Presentatie modus voor groot scherm (via URL `?mode=presentation`)
+- ✅ Meal planning (lunch/diner per dag)
+- ✅ Swipe om taak te verwijderen
+- ✅ Week navigatie in presentatie modus
 
 ---
 
@@ -172,13 +182,14 @@ UPDATE users SET pin = 'nieuwe_pin' WHERE name = 'Bijan';
 
 ### App laadt niet na deploy
 - Wacht 1-2 minuten tot GitHub Pages klaar is met bouwen
-- Check of de `dist` folder correct is gedeployed
+- Check of de GitHub secrets correct zijn ingesteld
 
 ### Database problemen
 - Ga naar Supabase dashboard > Table Editor
 - Check of de tabellen correct zijn aangemaakt
+- Controleer de RLS policies
 
-###PIN werkt niet
+### PIN werkt niet
 - Controleer of gebruikers bestaan in Supabase:
   ```sql
   SELECT * FROM users;
@@ -188,8 +199,16 @@ UPDATE users SET pin = 'nieuwe_pin' WHERE name = 'Bijan';
 
 ## Versie History
 
+- **v1.1** (feb 2026): 
+  - Meal planning feature
+  - Presentatie modus via URL parameter
+  - Swipe to delete taken
+  - Non-recurring taken (éénmalig)
+  - Week navigatie in presentatie modus
+  - Betere mobile UX
+
 - **v1.0** (feb 2026): Initiele release
   - PIN login
   - Week/dag view
   - Taak toewijzing
-  - Confetti/geluid (later vereenvoudigd)
+  - Confetti animatie
