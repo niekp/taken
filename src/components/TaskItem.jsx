@@ -4,12 +4,48 @@ export default function TaskItem({ task, isCompleted, onComplete, onUncomplete, 
     : users.find(u => u.id === task.assigned_to)?.name || 'Niemand'
 
   const assigneeConfig = {
-    'Samen': { bg: 'bg-pastel-lavender', border: 'border-pastel-lavenderDark', text: 'text-pastel-lavenderDark' },
-    'Bijan': { bg: 'bg-brand-bijan/20', border: 'border-brand-bijan', text: 'text-brand-bijan' },
-    'Esther': { bg: 'bg-brand-esther/20', border: 'border-brand-esther', text: 'text-brand-esther' },
+    'Samen': { bg: 'bg-pastel-lavender', border: 'border-pastel-lavenderDark', text: 'text-pastel-lavenderDark', dot: 'bg-pastel-lavenderDark' },
+    'Bijan': { bg: 'bg-brand-bijan/20', border: 'border-brand-bijan', text: 'text-brand-bijan', dot: 'bg-brand-bijan' },
+    'Esther': { bg: 'bg-brand-esther/20', border: 'border-brand-esther', text: 'text-brand-esther', dot: 'bg-brand-esther' },
   }
 
-  const config = assigneeConfig[assignee] || { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-500' }
+  const config = assigneeConfig[assignee] || { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-500', dot: 'bg-gray-400' }
+
+  if (presentationMode) {
+    return (
+      <div
+        onClick={() => onEdit && onEdit(task)}
+        className={`flex items-center gap-3 p-2 rounded-lg bg-white/80 hover:bg-white transition-all cursor-pointer ${isCompleted ? 'opacity-50' : ''}`}
+      >
+        <div
+          onClick={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            if (isCompleted) {
+              onUncomplete()
+            } else {
+              onComplete()
+            }
+          }}
+          className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${isCompleted ? 'bg-accent-mint border-accent-mint' : 'border-gray-300 hover:border-accent-mint bg-white'}`}
+        >
+          {isCompleted && (
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <p className={`font-medium text-sm leading-tight whitespace-normal ${isCompleted ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+            {task.title}
+          </p>
+        </div>
+
+        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${config.dot}`} title={assignee} />
+      </div>
+    )
+  }
 
   return (
     <div
