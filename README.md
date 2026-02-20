@@ -130,11 +130,6 @@ De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naa
 
 ### Gebruikers toevoegen via SQL
 
-```sql
-INSERT INTO users (pin, name) VALUES 
-  ('1234', 'Bijan'),
-  ('1234', 'Esther');
-```
 
 ### PIN wijzigen
 
@@ -147,7 +142,7 @@ UPDATE users SET pin = 'nieuwe_pin' WHERE name = 'Bijan';
 ## Gebruik van de App
 
 1. Open de URL
-2. Voer PIN in: **1234**
+2. Voer PIN in: **PINCODE**
 3. Selecteer je naam (Bijan of Esther)
 4. Navigeer tussen dagen met swipe of pijltjes
 5. Tik op "+" om taak toe te voegen
