@@ -78,9 +78,22 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   }
 
   function getTasksForDay(dayIndex) {
+    const weekDates = getWeekDates(currentWeekOffset)
+    const weekStart = weekDates[0]
+    const weekEnd = new Date(weekDates[6])
+    weekEnd.setHours(23, 59, 59, 999)
+    
     return tasks.filter(task => {
       const taskDay = task.day_of_week
       if (taskDay !== dayIndex) return false
+      
+      if (task.is_recurring) {
+        // Recurring tasks show every week
+      } else {
+        // Non-recurring tasks only show in the week they were created
+        const createdAt = new Date(task.created_at)
+        if (createdAt < weekStart || createdAt > weekEnd) return false
+      }
       
       if (filter === 'bijan') {
         return task.assigned_to === users.find(u => u.name === 'Bijan')?.id || task.is_both
