@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
@@ -15,7 +15,6 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   const [editTask, setEditTask] = useState(null)
   const [filter, setFilter] = useState('all')
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0)
-  const swipeStart = useRef(null)
 
   const today = new Date()
   const currentDayIndex = today.getDay() === 0 ? 6 : today.getDay() - 1
@@ -150,23 +149,6 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     d.setDate(d.getDate() + 4 - (d.getDay() || 7))
     const yearStart = new Date(d.getFullYear(), 0, 1)
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
-  }
-
-  function handleSwipeStart(e) {
-    swipeStart.current = e.touches[0].clientX
-  }
-
-  function handleSwipeEnd(e) {
-    if (!swipeStart.current) return
-    const diff = e.changedTouches[0].clientX - swipeStart.current
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) {
-        setActiveDay(prev => prev > 0 ? prev - 1 : 6)
-      } else {
-        setActiveDay(prev => prev < 6 ? prev + 1 : 0)
-      }
-    }
-    swipeStart.current = null
   }
 
   function formatDate(date) {
@@ -335,11 +317,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   }
 
   return (
-    <div 
-      className="min-h-screen bg-pastel-cream overflow-x-hidden"
-      onTouchStart={handleSwipeStart}
-      onTouchEnd={handleSwipeEnd}
-    >
+    <div className="min-h-screen bg-pastel-cream overflow-x-hidden">
       <div className="sticky top-0 z-40 glass border-b border-gray-100">
         <div className="flex items-center justify-between px-4 py-3">
           <button onClick={onOpenMenu} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors">
