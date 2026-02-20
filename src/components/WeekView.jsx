@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
+import MealInput from './MealInput'
 
 const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -9,6 +10,7 @@ const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Za
 export default function WeekView({ currentUser, users, onComplete, presentationMode, onTogglePresentation, onOpenMenu }) {
   const [tasks, setTasks] = useState([])
   const [completedTasks, setCompletedTasks] = useState([])
+  const [meals, setMeals] = useState([])
   const [selectedDay, setSelectedDay] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
@@ -35,7 +37,23 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   useEffect(() => {
     loadTasks()
     loadCompletedTasks()
+    loadMeals()
   }, [currentWeekOffset])
+
+  async function loadMeals() {
+    const weekDates = getWeekDates(currentWeekOffset)
+    const weekNumber = getWeekNumber(weekDates[0])
+    const year = weekDates[0].getFullYear()
+    
+    const { data } = await supabase
+      .from('meals')
+      .select('*')
+      .eq('week_number', weekNumber)
+      .eq('year', year)
+      .order('day_of_week')
+    
+    if (data) setMeals(data)
+  }
 
   async function loadTasks() {
     const { data } = await supabase
@@ -158,6 +176,40 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     })
   }
 
+  function getMealsForDay(dayIndex) {
+    return meals.filter(meal => meal.day_of_week === dayIndex)
+  }
+
+  async function addMeal(dayIndex, mealName, mealType) {
+    const weekNumber = getWeekNumber(weekDates[0])
+    const year = weekDates[0].getFullYear()
+    
+    const { error } = await supabase
+      .from('meals')
+      .insert({
+        day_of_week: dayIndex,
+        meal_name: mealName,
+        meal_type: mealType,
+        week_number: weekNumber,
+        year: year
+      })
+    
+    if (!error) {
+      loadMeals()
+    }
+  }
+
+  async function deleteMeal(mealId) {
+    const { error } = await supabase
+      .from('meals')
+      .delete()
+      .eq('id', mealId)
+    
+    if (!error) {
+      loadMeals()
+    }
+  }
+
   const indicators = getIndicators()
 
   if (presentationMode) {
@@ -172,7 +224,25 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-800">Divide/Chores</h1>
-            <p className="text-gray-500 text-sm">{getWeekRange()}</p>
+            <div className="flex items-center justify-center gap-2 mt-1">
+              <button 
+                onClick={() => setCurrentWeekOffset(prev => prev - 1)}
+                className="p-1 hover:bg-white/50 rounded"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <p className="text-gray-500 text-sm">{getWeekRange()}</p>
+              <button 
+                onClick={() => setCurrentWeekOffset(prev => prev + 1)}
+                className="p-1 hover:bg-white/50 rounded"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
             {currentWeekOffset === 0 && (
               <p className="text-accent-mint text-sm font-medium mt-1">Vandaag: {DAY_NAMES[currentDayIndex]}</p>
             )}
@@ -227,6 +297,17 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                       +{dayTasks.length - 8} meer
                     </p>
                   )}
+                  
+                  {getMealsForDay(i).length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-gray-100">
+                      <p className="text-xs font-medium text-gray-400 mb-2">Eten</p>
+                      {getMealsForDay(i).map(meal => (
+                        <div key={meal.id} className="text-sm text-gray-600 py-1 px-2 bg-pastel-peach/30 rounded-lg mb-1">
+                          {meal.meal_type === 'lunch' ? '🍞' : '🍝'} {meal.meal_name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -252,7 +333,25 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           
           <div className="text-center">
             <h1 className="text-lg font-semibold text-gray-800">Divide/Chores</h1>
-            <p className="text-gray-400 text-xs">{getWeekRange()}</p>
+            <div className="flex items-center justify-center gap-2 mt-0.5">
+              <button 
+                onClick={() => setCurrentWeekOffset(prev => prev - 1)}
+                className="p-1 hover:bg-white/50 rounded"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <p className="text-gray-400 text-xs">{getWeekRange()}</p>
+              <button 
+                onClick={() => setCurrentWeekOffset(prev => prev + 1)}
+                className="p-1 hover:bg-white/50 rounded"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
           
           <button onClick={onTogglePresentation} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors" title="Presentatie modus">
@@ -352,6 +451,35 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               <p className="text-gray-300 text-sm mt-1">Druk op + om een taak toe te voegen</p>
             </div>
           )}
+        </div>
+
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            Eten
+          </h2>
+          
+          {getMealsForDay(activeDay).length > 0 && (
+            <div className="space-y-2 mb-4">
+              {getMealsForDay(activeDay).map(meal => (
+                <div key={meal.id} className="flex items-center justify-between bg-pastel-peach/30 rounded-xl p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{meal.meal_type === 'lunch' ? '🍞' : '🍝'}</span>
+                    <span className="text-gray-700">{meal.meal_name}</span>
+                  </div>
+                  <button 
+                    onClick={() => deleteMeal(meal.id)}
+                    className="text-gray-400 hover:text-red-400 p-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <MealInput onAdd={(name, type) => addMeal(activeDay, name, type)} />
         </div>
       </div>
 
