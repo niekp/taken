@@ -225,38 +225,38 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
   if (presentationMode) {
     return (
-      <div className="h-screen p-6 bg-gradient-to-br from-pastel-cream to-pastel-mint/20 overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between mb-6">
-          <div className="w-10" />
+      <div className="h-screen p-4 md:p-6 bg-gradient-to-br from-pastel-cream to-pastel-mint/20 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between mb-4 md:mb-6">
+          <div className="w-8 md:w-10" />
           
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-800">Divide/Chores</h1>
-            <div className="flex items-center justify-center gap-3 mt-2">
+            <h1 className="text-xl md:text-3xl font-bold text-gray-800">Divide/Chores</h1>
+            <div className="flex items-center justify-center gap-2 md:gap-3 mt-1 md:mt-2">
               <button 
                 onClick={() => setCurrentWeekOffset(prev => prev - 1)}
-                className="p-2 hover:bg-white/60 rounded-lg transition-colors"
+                className="p-1.5 md:p-2 hover:bg-white/60 rounded-lg transition-colors"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <p className="text-gray-500 text-lg font-medium min-w-[180px] text-center">{getWeekRange()}</p>
+              <p className="text-sm md:text-lg text-gray-500 font-medium min-w-[140px] md:min-w-[180px] text-center">{getWeekRange()}</p>
               <button 
                 onClick={() => setCurrentWeekOffset(prev => prev + 1)}
-                className="p-2 hover:bg-white/60 rounded-lg transition-colors"
+                className="p-1.5 md:p-2 hover:bg-white/60 rounded-lg transition-colors"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
             </div>
             {currentWeekOffset === 0 && (
-              <p className="text-accent-mint text-lg font-semibold mt-2">Vandaag: {DAY_NAMES[currentDayIndex]}</p>
+              <p className="text-accent-mint text-sm md:text-lg font-semibold mt-1 md:mt-2">Vandaag: {DAY_NAMES[currentDayIndex]}</p>
             )}
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 rounded-full bg-brand-bijan"></div>
                 <span>Bijan</span>
@@ -271,14 +271,14 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               </div>
             </div>
             <button onClick={onTogglePresentation} className="p-2 hover:bg-white/60 rounded-lg transition-colors" title="Presentatie modus afsluiten">
-              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 md:w-6 md:h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
         </div>
 
-        <div className="flex-1 flex gap-4 overflow-x-auto">
+        <div className="md:flex-1 md:flex md:gap-4 md:overflow-x-auto hidden">
           {DAYS.map((day, i) => {
             const dayTasks = getTasksForDay(i)
             const dayMeals = getMealsForDay(i)
@@ -287,13 +287,13 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
             return (
               <div key={i} className="flex-1 flex flex-col min-w-0 bg-white/60 rounded-2xl">
-                <div className={`text-center p-4 transition-all duration-300 ${
+                <div className={`text-center p-3 md:p-4 transition-all duration-300 ${
                   isToday 
                     ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg' 
                     : 'bg-white shadow-sm'
                 }`}>
                   <p className={`font-medium ${isToday ? 'text-white/80' : 'text-gray-500'}`}>{DAYS[i]}</p>
-                  <p className={`text-3xl font-bold mt-1 ${isToday ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[i])}</p>
+                  <p className={`text-2xl md:text-3xl font-bold mt-1 ${isToday ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[i])}</p>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
@@ -328,6 +328,71 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               </div>
             )
           })}
+        </div>
+
+        <div className="flex-1 md:hidden flex flex-col overflow-hidden">
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-3 snap-x">
+            {DAYS.map((day, i) => {
+              const isToday = i === currentDayIndex && currentWeekOffset === 0
+              return (
+                <button
+                  key={i}
+                  onClick={() => setActiveDay(i)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all snap-start ${
+                    activeDay === i
+                      ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-soft'
+                      : isToday
+                        ? 'bg-white shadow-card text-gray-700'
+                        : 'bg-white/60 text-gray-500'
+                  }`}
+                >
+                  <span className="block text-xs opacity-70">{day}</span>
+                  <span className="block text-lg font-bold mt-0.5">{formatDate(weekDates[i])}</span>
+                </button>
+              )
+            })}
+          </div>
+          
+          <div className="flex-1 overflow-y-auto bg-white/60 rounded-2xl">
+            <div className={`text-center p-3 transition-all duration-300 ${
+              activeDay === currentDayIndex && currentWeekOffset === 0
+                ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg rounded-t-2xl' 
+                : 'bg-white shadow-sm rounded-t-2xl'
+            }`}>
+              <p className={`font-medium ${activeDay === currentDayIndex && currentWeekOffset === 0 ? 'text-white/80' : 'text-gray-500'}`}>{DAY_NAMES[activeDay]}</p>
+              <p className={`text-3xl font-bold mt-1 ${activeDay === currentDayIndex && currentWeekOffset === 0 ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[activeDay])}</p>
+            </div>
+            
+            <div className="p-3 space-y-2">
+              {getMealsForDay(activeDay).map(meal => (
+                <div key={meal.id} className="bg-pastel-peach/60 rounded-xl px-3 py-2.5 text-base font-medium text-gray-700 flex items-center gap-2">
+                  <span>{meal.meal_type === 'lunch' ? '🍞' : '🍝'}</span>
+                  <span className="whitespace-normal">{meal.meal_name}</span>
+                </div>
+              ))}
+              {getTasksForDay(activeDay).map(task => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  isCompleted={isTaskCompleted(task.id)}
+                  onComplete={() => handleCompleteTask(task)}
+                  onUncomplete={() => handleUncompleteTask(task)}
+                  onEdit={(t) => {
+                    setEditTask(t)
+                    setShowModal(true)
+                  }}
+                  users={users}
+                  isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
+                  presentationMode={true}
+                />
+              ))}
+              {(getTasksForDay(activeDay).length === 0 && getMealsForDay(activeDay).length === 0) && (
+                <div className="text-center text-gray-400 py-8">
+                  Geen taken
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     )
