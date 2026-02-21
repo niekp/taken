@@ -9,6 +9,8 @@ export default function Login({ onLogin, onSelectUser, users }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (pin.length !== 4) return
+    
     setError('')
     setIsLoading(true)
     
@@ -17,6 +19,7 @@ export default function Login({ onLogin, onSelectUser, users }) {
     
     if (!matched) {
       setError('Ongeldige PIN')
+      setPin('')
       return
     }
     
@@ -26,6 +29,22 @@ export default function Login({ onLogin, onSelectUser, users }) {
       setMatchedUsers(matched)
       setShowUserSelect(true)
     }
+  }
+
+  function handleNumberClick(num) {
+    if (pin.length < 4) {
+      const newPin = pin + num
+      setPin(newPin)
+      if (newPin.length === 4) {
+        setTimeout(() => {
+          handleSubmit({ preventDefault: () => {} })
+        }, 200)
+      }
+    }
+  }
+
+  function handleDelete() {
+    setPin(pin.slice(0, -1))
   }
 
   function handleSelectUser(user) {
@@ -88,19 +107,20 @@ export default function Login({ onLogin, onSelectUser, users }) {
           <p className="text-gray-500 mt-2">Own your chores.</p>
         </div>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <input
-              type="password"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="PIN Code"
-              className="input-field text-center text-2xl tracking-[0.5em] py-5"
-              maxLength={6}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoFocus
-            />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex justify-center gap-3">
+            {[0, 1, 2, 3].map(i => (
+              <div
+                key={i}
+                className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center text-3xl font-light transition-all duration-200 ${
+                  pin.length > i
+                    ? 'border-pastel-mint bg-pastel-mint/20 text-gray-800'
+                    : 'border-gray-200 text-gray-300'
+                }`}
+              >
+                {pin.length > i ? '●' : ''}
+              </div>
+            ))}
           </div>
           
           {error && (
@@ -112,10 +132,34 @@ export default function Login({ onLogin, onSelectUser, users }) {
             </div>
           )}
           
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'del'].map((item, i) => (
+              <button
+                key={i}
+                type="button"
+                disabled={isLoading || (item === null)}
+                onClick={() => item === 'del' ? handleDelete() : item && handleNumberClick(String(item))}
+                className={`h-14 rounded-xl text-2xl font-medium transition-all duration-150 active:scale-95 ${
+                  item === null
+                    ? 'invisible'
+                    : item === 'del'
+                    ? 'bg-gray-100 text-gray-600'
+                    : 'bg-white shadow-soft text-gray-700 hover:bg-gray-50'
+                } ${isLoading ? 'opacity-50' : ''}`}
+              >
+                {item === 'del' ? (
+                  <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H19.5a2 2 0 002-2V5a2 2 0 00-2-2h-8.172a2 2 0 00-1.414.586L3 12z" />
+                  </svg>
+                ) : item}
+              </button>
+            ))}
+          </div>
+          
           <button 
             type="submit" 
-            disabled={isLoading || !pin}
-            className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-2"
+            disabled={isLoading || pin.length !== 4}
+            className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
@@ -133,8 +177,8 @@ export default function Login({ onLogin, onSelectUser, users }) {
           </button>
         </form>
         
-        <p className="mt-8 text-gray-400 text-xs text-center">
-          Voer je persoonlijke PIN in om te starten
+        <p className="mt-6 text-gray-400 text-xs text-center">
+          Tik je pincode in
         </p>
       </div>
     </div>
