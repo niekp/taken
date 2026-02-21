@@ -168,6 +168,12 @@ De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naa
 1. Klik op "+" → kies "Eten"
 2. Of voeg het toe via de taak-modal
 
+### Statistieken bekijken
+1. Open het menu (hamburger linksboven)
+2. Klik op "Statistieken"
+3. Kies een periode: Week, Maand, Jaar, of Alle tijden
+4. Bekijk statistieken per persoon en meest voltooide taken
+
 ---
 
 ## Features
@@ -187,6 +193,7 @@ De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naa
 - ✅ Week navigatie in presentatie modus
 - ✅ Profielfoto's instellen (via menu)
 - ✅ PWA ondersteuning (opslaan op homescherm)
+- ✅ Statistieken (week/maand/jaar/alle tijden)
 
 ---
 
@@ -211,6 +218,11 @@ De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naa
 ---
 
 ## Versie History
+
+- **v1.3** (feb 2026): 
+  - Statistieken feature (week/maand/jaar/alle tijden)
+  - Profielfoto's zichtbaar bij taken en filters
+  - Betere mobile presentatie modus
 
 - **v1.2** (feb 2026): 
   - Profielfoto's instellen per gebruiker

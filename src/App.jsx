@@ -4,6 +4,7 @@ import Login from './components/Login'
 import WeekView from './components/WeekView'
 import TaskModal from './components/TaskModal'
 import Menu from './components/Menu'
+import Stats from './components/Stats'
 import Confetti from './components/Confetti'
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
   const [showMenu, setShowMenu] = useState(false)
+  const [showStats, setShowStats] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [presentationMode, setPresentationMode] = useState(() => {
     const params = new URLSearchParams(window.location.search)
@@ -120,6 +122,17 @@ export default function App() {
           presentationMode={presentationMode}
           onTogglePresentation={() => setPresentationMode(!presentationMode)}
           onUpdateUser={handleUpdateUser}
+          onOpenStats={() => {
+            setShowMenu(false)
+            setShowStats(true)
+          }}
+        />
+      )}
+
+      {showStats && (
+        <Stats 
+          onClose={() => setShowStats(false)}
+          users={users}
         />
       )}
     </div>
