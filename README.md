@@ -179,6 +179,7 @@ De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naa
 ## Features
 
 - ✅ Mobile-first design
+- ✅ Numeriek toetsenbord voor PIN invoer
 - ✅ Week view in presentatie modus
 - ✅ Presentatie modus ook op mobiel (dag-carousel)
 - ✅ Taken toewijzen aan Bijan, Esther, of samen
@@ -193,6 +194,7 @@ De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naa
 - ✅ Week navigatie in presentatie modus
 - ✅ Profielfoto's instellen (via menu)
 - ✅ PWA ondersteuning (opslaan op homescherm)
+- ✅ PWA auto-update (altijd nieuwste versie)
 - ✅ Statistieken (week/maand/jaar/alle tijden)
 
 ---
@@ -215,9 +217,18 @@ De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naa
   SELECT * FROM users;
   ```
 
+### PWA laadt oude versie
+- De app checkt automatisch op nieuwe versies bij het openen
+- Als je een oude versie ziet, sluit de app dan af en open opnieuw
+- Of verwijder de app van je homescherm en voeg opnieuw toe
+
 ---
 
 ## Versie History
+
+- **v1.4** (feb 2026): 
+  - PWA auto-update (altijd nieuwste versie)
+  - Numeriek toetsenbord voor PIN invoer
 
 - **v1.3** (feb 2026): 
   - Statistieken feature (week/maand/jaar/alle tijden)
