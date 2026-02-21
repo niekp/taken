@@ -76,7 +76,7 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
       label: (
         <span className="flex items-center gap-2">
           Statistieken
-          <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">🧪</span>
+          <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded font-medium">BETA</span>
         </span>
       ),
       onClick: onOpenStats,
