@@ -90,6 +90,8 @@ export const api = {
   getMeals: (from, to) =>
     request(`/meals?from=${from}&to=${to}`),
 
+  getMealSuggestions: () => request('/meals/suggestions'),
+
   createMeal: (meal) => request('/meals', {
     method: 'POST',
     body: JSON.stringify(meal),

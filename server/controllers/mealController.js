@@ -26,3 +26,7 @@ export function remove(req, res) {
   if (!deleted) return res.status(404).json({ error: 'Meal not found' })
   res.json({ success: true })
 }
+
+export function suggestions(req, res) {
+  res.json(mealRepo.recentNames())
+}

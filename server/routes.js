@@ -31,7 +31,8 @@ router.delete('/tasks/:id', taskController.remove)
 router.post('/tasks/:id/complete', taskController.complete)
 router.post('/tasks/:id/uncomplete', taskController.uncomplete)
 
-// Meals
+// Meals (static routes before parameterized)
+router.get('/meals/suggestions', mealController.suggestions)
 router.get('/meals', mealController.list)
 router.post('/meals', mealController.create)
 router.put('/meals/:id', mealController.update)

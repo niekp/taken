@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 
 const DAY_NAMES = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
@@ -22,18 +22,27 @@ function getDays() {
 
 export default function MealsView({ onOpenMenu, presentationMode, onTogglePresentation }) {
   const [meals, setMeals] = useState([])
+  const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingDate, setEditingDate] = useState(null)
   const [editingMealId, setEditingMealId] = useState(null)
   const [inputValue, setInputValue] = useState('')
+  const [showAutocomplete, setShowAutocomplete] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const inputRef = useRef(null)
+  const autocompleteRef = useRef(null)
 
   const days = getDays()
 
   useEffect(() => {
     loadMeals()
+    loadSuggestions()
 
     function handleVisibilityChange() {
-      if (!document.hidden) loadMeals()
+      if (!document.hidden) {
+        loadMeals()
+        loadSuggestions()
+      }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -51,6 +60,21 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
     setLoading(false)
   }
 
+  async function loadSuggestions() {
+    try {
+      const data = await api.getMealSuggestions()
+      setSuggestions(data)
+    } catch (err) {
+      console.error('Failed to load suggestions:', err)
+    }
+  }
+
+  function getFilteredSuggestions() {
+    const query = inputValue.trim().toLowerCase()
+    if (!query) return suggestions
+    return suggestions.filter(s => s.toLowerCase().includes(query))
+  }
+
   function getMealForDate(dateStr) {
     return meals.find(m => m.date === dateStr)
   }
@@ -59,18 +83,30 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
     setEditingDate(dateStr)
     setEditingMealId(null)
     setInputValue('')
+    setShowAutocomplete(true)
+    setSelectedIndex(-1)
   }
 
   function startEditing(meal) {
     setEditingDate(meal.date)
     setEditingMealId(meal.id)
     setInputValue(meal.meal_name)
+    setShowAutocomplete(false)
+    setSelectedIndex(-1)
   }
 
   function cancelEditing() {
     setEditingDate(null)
     setEditingMealId(null)
     setInputValue('')
+    setShowAutocomplete(false)
+    setSelectedIndex(-1)
+  }
+
+  function selectSuggestion(name) {
+    setInputValue(name)
+    setShowAutocomplete(false)
+    setSelectedIndex(-1)
   }
 
   async function handleSave(dateStr) {
@@ -84,6 +120,7 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
       }
       cancelEditing()
       loadMeals()
+      loadSuggestions()
     } catch (err) {
       console.error('Failed to save meal:', err)
     }
@@ -149,11 +186,13 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
           return (
             <div
               key={dateStr}
-              className={`rounded-2xl overflow-hidden transition-all ${
+              className={`rounded-2xl transition-all ${
+                isEditing ? '' : 'overflow-hidden'
+              } ${
                 today ? 'shadow-soft ring-2 ring-accent-mint/30' : 'shadow-card'
               }`}
             >
-              <div className={`px-4 py-3 flex items-center justify-between ${
+              <div className={`px-4 py-3 flex items-center justify-between rounded-t-2xl ${
                 today
                   ? 'bg-gradient-to-r from-accent-mint to-pastel-mintDark text-white'
                   : 'bg-white'
@@ -194,20 +233,72 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
               </div>
 
               {isEditing ? (
-                <div className="bg-white px-4 py-3 border-t border-gray-100">
+                <div className="bg-white px-4 py-3 border-t border-gray-100 rounded-b-2xl">
                   <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={inputValue}
-                      onChange={e => setInputValue(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleSave(dateStr)
-                        if (e.key === 'Escape') cancelEditing()
-                      }}
-                      placeholder="Wat eten we?"
-                      className="input-field flex-1"
-                      autoFocus
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={inputValue}
+                        onChange={e => {
+                          setInputValue(e.target.value)
+                          setShowAutocomplete(true)
+                          setSelectedIndex(-1)
+                        }}
+                        onFocus={() => {
+                          setShowAutocomplete(true)
+                          setSelectedIndex(-1)
+                        }}
+                        onKeyDown={e => {
+                          const filtered = getFilteredSuggestions()
+                          if (e.key === 'ArrowDown') {
+                            e.preventDefault()
+                            setSelectedIndex(prev => Math.min(prev + 1, filtered.length - 1))
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault()
+                            setSelectedIndex(prev => Math.max(prev - 1, -1))
+                          } else if (e.key === 'Enter') {
+                            if (selectedIndex >= 0 && filtered[selectedIndex]) {
+                              selectSuggestion(filtered[selectedIndex])
+                            } else {
+                              handleSave(dateStr)
+                            }
+                          } else if (e.key === 'Escape') {
+                            if (showAutocomplete) {
+                              setShowAutocomplete(false)
+                            } else {
+                              cancelEditing()
+                            }
+                          }
+                        }}
+                        placeholder="Wat eten we?"
+                        className="input-field w-full"
+                        autoFocus
+                      />
+                      {showAutocomplete && getFilteredSuggestions().length > 0 && (
+                        <div
+                          ref={autocompleteRef}
+                          className="absolute z-50 left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-soft-lg border border-gray-100 max-h-48 overflow-y-auto"
+                        >
+                          {getFilteredSuggestions().map((name, idx) => (
+                            <button
+                              key={name}
+                              onMouseDown={e => {
+                                e.preventDefault()
+                                selectSuggestion(name)
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                                idx === selectedIndex
+                                  ? 'bg-pastel-mint/30 text-accent-mint'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              } ${idx === 0 ? 'rounded-t-xl' : ''} ${idx === getFilteredSuggestions().length - 1 ? 'rounded-b-xl' : ''}`}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => handleSave(dateStr)}
                       disabled={!inputValue.trim()}
@@ -226,7 +317,7 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
                   </div>
                 </div>
               ) : meal ? (
-                <div className="bg-white px-4 py-3 border-t border-gray-100">
+                <div className="bg-white px-4 py-3 border-t border-gray-100 rounded-b-2xl">
                   <div className="flex items-center justify-between">
                     <button
                       onClick={() => startEditing(meal)}

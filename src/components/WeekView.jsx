@@ -10,6 +10,7 @@ const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Za
 export default function WeekView({ currentUser, users, onComplete, presentationMode, onTogglePresentation, onOpenMenu }) {
   const [tasks, setTasks] = useState([])
   const [ghosts, setGhosts] = useState([])
+  const [meals, setMeals] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [filter, setFilter] = useState('all')
@@ -57,10 +58,14 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         await api.runHousekeeping()
       }
 
-      const taskData = await api.getTasks(from, to)
+      const [taskData, mealData] = await Promise.all([
+        api.getTasks(from, to),
+        api.getMeals(from, to),
+      ])
 
       setTasks(taskData.tasks || [])
       setGhosts(taskData.ghosts || [])
+      setMeals(mealData)
     } catch (err) {
       console.error('Failed to load data:', err)
     }
@@ -132,6 +137,11 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     const startStr = `${start.getDate()}/${start.getMonth() + 1}`
     const endStr = `${end.getDate()}/${end.getMonth() + 1}`
     return `${startStr} - ${endStr}`
+  }
+
+  function getMealForDay(dayIndex) {
+    const dateStr = formatDateISO(weekDates[dayIndex])
+    return meals.find(m => m.date === dateStr)
   }
 
   if (presentationMode) {
@@ -209,6 +219,15 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                  {(() => {
+                    const meal = getMealForDay(i)
+                    return meal ? (
+                      <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200/60 rounded-xl">
+                        <span className="text-sm">🍽️</span>
+                        <span className="text-xs font-medium text-amber-800 truncate">{meal.meal_name}</span>
+                      </div>
+                    ) : null
+                  })()}
                   {dayTasks.map(task => (
                     <TaskItem
                       key={task.id}
@@ -223,7 +242,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                   {dayGhosts.map(ghost => (
                     <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
                   ))}
-                  {!hasItems && (
+                  {!hasItems && !getMealForDay(i) && (
                     <div className="text-center text-gray-400 py-8 text-sm">
                       Geen taken
                     </div>
@@ -271,8 +290,15 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             <div className="p-3 space-y-2">
               {(() => {
                 const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(activeDay)
+                const meal = getMealForDay(activeDay)
                 return (
                   <>
+                    {meal && (
+                      <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200/60 rounded-2xl">
+                        <span className="text-lg">🍽️</span>
+                        <span className="text-sm font-medium text-amber-800">{meal.meal_name}</span>
+                      </div>
+                    )}
                     {dayTasks.map(task => (
                       <TaskItem
                         key={task.id}
@@ -287,7 +313,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                     {dayGhosts.map(ghost => (
                       <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
                     ))}
-                    {dayTasks.length === 0 && dayGhosts.length === 0 && (
+                    {!meal && dayTasks.length === 0 && dayGhosts.length === 0 && (
                       <div className="text-center text-gray-400 py-8">
                         Geen taken
                       </div>
@@ -435,8 +461,15 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           {(() => {
             const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(activeDay)
             const isToday = activeDay === currentDayIndex && currentWeekOffset === 0
+            const meal = getMealForDay(activeDay)
             return (
               <>
+                {meal && (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200/60 rounded-2xl">
+                    <span className="text-lg">🍽️</span>
+                    <span className="text-sm font-medium text-amber-800">{meal.meal_name}</span>
+                  </div>
+                )}
                 {dayTasks.map(task => (
                   <TaskItem
                     key={task.id}
@@ -455,7 +488,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 {dayGhosts.map(ghost => (
                   <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={false} />
                 ))}
-                {dayTasks.length === 0 && dayGhosts.length === 0 && (
+                {!meal && dayTasks.length === 0 && dayGhosts.length === 0 && (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-pastel-lavender/50 rounded-2xl mx-auto mb-4 flex items-center justify-center">
                       <svg className="w-8 h-8 text-pastel-lavenderDark" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -28,3 +28,15 @@ export function remove(id) {
   const result = db.prepare('DELETE FROM meals WHERE id = ?').run(id)
   return result.changes > 0
 }
+
+export function recentNames(days = 30) {
+  const db = getDb()
+  const since = new Date()
+  since.setDate(since.getDate() - days)
+  const sinceStr = since.toISOString().split('T')[0]
+  return db.prepare(`
+    SELECT meal_name FROM meals WHERE date >= ?
+    GROUP BY meal_name COLLATE NOCASE
+    ORDER BY MAX(date) DESC
+  `).all(sinceStr).map(r => r.meal_name)
+}
