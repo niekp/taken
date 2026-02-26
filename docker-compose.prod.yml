@@ -9,6 +9,3 @@ services:
     environment:
       - DB_PATH=/data/chores.db
     restart: unless-stopped
-
-volumes:
-  taken-data:
