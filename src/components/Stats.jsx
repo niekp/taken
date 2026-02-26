@@ -32,13 +32,13 @@ export default function Stats({ onClose, users }) {
         tasksByUser[u.id] = { name: u.name, avatar_url: u.avatar_url, color: u.color, count: 0 }
       })
 
-      data.forEach(ct => {
-        if (ct.user_id && tasksByUser[ct.user_id]) {
-          tasksByUser[ct.user_id].count++
+      data.forEach(task => {
+        if (task.completed_by && tasksByUser[task.completed_by]) {
+          tasksByUser[task.completed_by].count++
         }
 
-        if (ct.tasks?.title) {
-          taskCounts[ct.tasks.title] = (taskCounts[ct.tasks.title] || 0) + 1
+        if (task.title) {
+          taskCounts[task.title] = (taskCounts[task.title] || 0) + 1
         }
       })
 

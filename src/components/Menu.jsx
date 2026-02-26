@@ -146,7 +146,6 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
     }] : []),
   ]
 
-  const dayNames = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
   return (
     <div className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-50 flex" onClick={onClose}>
@@ -266,14 +265,14 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {completedTasks.map(ct => (
-                    <div key={ct.id} className="p-4 bg-gray-50 rounded-2xl">
-                      <p className="font-medium text-gray-700">{ct.tasks?.title}</p>
+                  {completedTasks.map(task => (
+                    <div key={task.id} className="p-4 bg-gray-50 rounded-2xl">
+                      <p className="font-medium text-gray-700">{task.title}</p>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-xs text-gray-400">{ct.users?.name}</span>
+                        <span className="text-xs text-gray-400">{task.completed_by_name}</span>
                         <span className="text-gray-300">•</span>
                         <span className="text-xs text-gray-400">
-                          {dayNames[ct.tasks?.day_of_week]} • {new Date(ct.completed_at).toLocaleDateString('nl-NL', {
+                          {new Date(task.completed_at).toLocaleDateString('nl-NL', {
                             day: 'numeric',
                             month: 'short',
                             hour: '2-digit',

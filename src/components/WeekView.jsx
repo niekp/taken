@@ -9,21 +9,18 @@ const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Za
 
 export default function WeekView({ currentUser, users, onComplete, presentationMode, onTogglePresentation, onOpenMenu }) {
   const [tasks, setTasks] = useState([])
-  const [completedTasks, setCompletedTasks] = useState(null)
-  const [meals, setMeals] = useState([])
-  const [selectedDay, setSelectedDay] = useState(null)
+  const [ghosts, setGhosts] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [filter, setFilter] = useState('all')
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0)
   const [resetKey, setResetKey] = useState(0)
-
-  const isLoading = completedTasks === null
+  const [isLoading, setIsLoading] = useState(true)
 
   const today = new Date()
   const currentDayIndex = today.getDay() === 0 ? 6 : today.getDay() - 1
   const [activeDay, setActiveDay] = useState(currentDayIndex)
-  
+
   function getWeekDates(offset = 0) {
     const start = new Date(today)
     start.setDate(today.getDate() - currentDayIndex + (offset * 7))
@@ -36,118 +33,77 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
   const weekDates = getWeekDates(currentWeekOffset)
 
+  function formatDateISO(d) {
+    return d.toISOString().split('T')[0]
+  }
+
   useEffect(() => {
-    loadTasks()
-    loadMeals()
-    loadCompletedTasks()
+    loadData()
 
     function handleVisibilityChange() {
-      if (!document.hidden) {
-        loadTasks()
-        loadCompletedTasks()
-        loadMeals()
-      }
+      if (!document.hidden) loadData()
     }
-
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [currentWeekOffset])
 
-  async function loadMeals() {
-    const weekDates = getWeekDates(currentWeekOffset)
-    const weekNumber = getWeekNumber(weekDates[0])
-    const year = weekDates[0].getFullYear()
-    
-    try {
-      const data = await api.getMeals(weekNumber, year)
-      setMeals(data)
-    } catch (err) {
-      console.error('Failed to load meals:', err)
-    }
-  }
+  async function loadData() {
+    const from = formatDateISO(weekDates[0])
+    const to = formatDateISO(weekDates[6])
 
-  async function loadTasks() {
     try {
-      const data = await api.getTasks()
-      setTasks(data)
-    } catch (err) {
-      console.error('Failed to load tasks:', err)
-    }
-  }
-
-  async function loadCompletedTasks() {
-    const weekNumber = getWeekNumber(weekDates[0])
-    const year = weekDates[0].getFullYear()
-    
-    try {
-      const data = await api.getCompletedTasks(weekNumber, year)
-      setCompletedTasks(data)
-    } catch (err) {
-      console.error('Failed to load completed tasks:', err)
-    }
-  }
-
-  function getTasksForDay(dayIndex) {
-    const weekDates = getWeekDates(currentWeekOffset)
-    const weekStart = weekDates[0]
-    const weekEnd = new Date(weekDates[6])
-    weekEnd.setHours(23, 59, 59, 999)
-    
-    return tasks.filter(task => {
-      const taskDay = task.day_of_week
-      if (taskDay !== dayIndex) return false
-      
-      if (task.is_recurring) {
-        // Recurring tasks show every week
-      } else {
-        // Non-recurring tasks only show in the week they were created
-        const createdAt = new Date(task.created_at)
-        if (createdAt < weekStart || createdAt > weekEnd) return false
+      // Run housekeeping on current week load
+      if (currentWeekOffset === 0) {
+        await api.runHousekeeping()
       }
-      
-      if (filter !== 'all') {
-        // filter is a user ID
-        return task.assigned_to === filter || task.is_both
-      }
-      return true
+
+      const taskData = await api.getTasks(from, to)
+
+      setTasks(taskData.tasks || [])
+      setGhosts(taskData.ghosts || [])
+    } catch (err) {
+      console.error('Failed to load data:', err)
+    }
+    setIsLoading(false)
+  }
+
+  function getItemsForDay(dayIndex) {
+    const dateStr = formatDateISO(weekDates[dayIndex])
+
+    let dayTasks = tasks.filter(t => t.date === dateStr)
+    let dayGhosts = ghosts.filter(g => g.date === dateStr)
+
+    // Apply user filter
+    if (filter !== 'all') {
+      dayTasks = dayTasks.filter(t => t.assigned_to === filter || t.is_both)
+      dayGhosts = dayGhosts.filter(g => g.assigned_to === filter || g.is_both)
+    }
+
+    // Sort: uncompleted first, then completed
+    dayTasks.sort((a, b) => {
+      if (a.completed_at && !b.completed_at) return 1
+      if (!a.completed_at && b.completed_at) return -1
+      return 0
     })
-  }
 
-  function isTaskCompleted(taskId) {
-    if (!completedTasks) return false
-    return completedTasks.some(ct => ct.task_id === taskId)
+    return { tasks: dayTasks, ghosts: dayGhosts }
   }
 
   async function handleCompleteTask(task) {
     if (!currentUser) return
-    
-    const weekNumber = getWeekNumber(weekDates[0])
-    const year = weekDates[0].getFullYear()
-    
     try {
-      await api.completeTask({
-        task_id: task.id,
-        user_id: currentUser.id,
-        week_number: weekNumber,
-        year: year,
-      })
-      loadCompletedTasks()
+      await api.completeTask(task.id, currentUser.id)
       onComplete()
+      loadData()
     } catch (err) {
       console.error('Failed to complete task:', err)
     }
   }
 
   async function handleUncompleteTask(task) {
-    const weekNumber = getWeekNumber(weekDates[0])
-    const year = weekDates[0].getFullYear()
-    
     try {
-      await api.uncompleteTask(task.id, weekNumber, year)
-      loadCompletedTasks()
+      await api.uncompleteTask(task.id)
+      loadData()
     } catch (err) {
       console.error('Failed to uncomplete task:', err)
     }
@@ -155,24 +111,15 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
   async function handleDeleteTask(task) {
     if (!confirm('Weet je zeker dat je deze taak wilt verwijderen?')) {
-      loadTasks()
+      loadData()
       return
     }
-    
     try {
       await api.deleteTask(task.id)
-      loadTasks()
+      loadData()
     } catch (err) {
       console.error('Failed to delete task:', err)
     }
-  }
-
-  function getWeekNumber(date) {
-    const d = new Date(date)
-    d.setHours(0, 0, 0, 0)
-    d.setDate(d.getDate() + 4 - (d.getDay() || 7))
-    const yearStart = new Date(d.getFullYear(), 0, 1)
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
   }
 
   function formatDate(date) {
@@ -187,56 +134,16 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     return `${startStr} - ${endStr}`
   }
 
-  function getIndicators() {
-    return DAYS.map((_, i) => {
-      const dayTasks = tasks.filter(t => t.day_of_week === i)
-      return dayTasks.length > 0
-    })
-  }
-
-  function getMealsForDay(dayIndex) {
-    return meals.filter(meal => meal.day_of_week === dayIndex)
-  }
-
-  async function addMeal(dayIndex, mealName, mealType) {
-    const weekNumber = getWeekNumber(weekDates[0])
-    const year = weekDates[0].getFullYear()
-    
-    try {
-      await api.createMeal({
-        day_of_week: dayIndex,
-        meal_name: mealName,
-        meal_type: mealType,
-        week_number: weekNumber,
-        year: year,
-      })
-      loadMeals()
-    } catch (err) {
-      console.error('Failed to add meal:', err)
-    }
-  }
-
-  async function deleteMeal(mealId) {
-    try {
-      await api.deleteMeal(mealId)
-      loadMeals()
-    } catch (err) {
-      console.error('Failed to delete meal:', err)
-    }
-  }
-
-  const indicators = getIndicators()
-
   if (presentationMode) {
     return (
       <div className="h-screen p-4 md:p-6 bg-gradient-to-br from-pastel-cream to-pastel-mint/20 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4 md:mb-6">
           <div className="w-8 md:w-10" />
-          
+
           <div className="text-center">
-            <h1 className="text-xl md:text-3xl font-bold text-gray-800">Divide/Chores</h1>
+            <h1 className="text-xl md:text-3xl font-bold text-gray-800">Huishouden</h1>
             <div className="flex items-center justify-center gap-2 md:gap-3 mt-1 md:mt-2">
-              <button 
+              <button
                 onClick={() => setCurrentWeekOffset(prev => prev - 1)}
                 className="p-1.5 md:p-2 hover:bg-white/60 rounded-lg transition-colors"
               >
@@ -245,7 +152,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 </svg>
               </button>
               <p className="text-sm md:text-lg text-gray-500 font-medium min-w-[140px] md:min-w-[180px] text-center">{getWeekRange()}</p>
-              <button 
+              <button
                 onClick={() => setCurrentWeekOffset(prev => prev + 1)}
                 className="p-1.5 md:p-2 hover:bg-white/60 rounded-lg transition-colors"
               >
@@ -258,7 +165,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               <p className="text-accent-mint text-sm md:text-lg font-semibold mt-1 md:mt-2">Vandaag: {DAY_NAMES[currentDayIndex]}</p>
             )}
           </div>
-          
+
           <div className="flex items-center gap-2 md:gap-3">
             <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
               {users.map(u => {
@@ -283,46 +190,38 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           </div>
         </div>
 
+        {/* Desktop: all days side by side */}
         <div className="md:flex-1 md:flex md:gap-4 md:overflow-x-auto hidden">
-          {DAYS.map((day, i) => {
-            const dayTasks = getTasksForDay(i)
-            const dayMeals = getMealsForDay(i)
+           {DAYS.map((day, i) => {
+            const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(i)
             const isToday = i === currentDayIndex && currentWeekOffset === 0
-            const hasItems = dayTasks.length > 0 || dayMeals.length > 0
+            const hasItems = dayTasks.length > 0 || dayGhosts.length > 0
 
             return (
               <div key={i} className="flex-1 flex flex-col min-w-0 bg-white/60 rounded-2xl">
                 <div className={`text-center p-3 md:p-4 transition-all duration-300 ${
-                  isToday 
-                    ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg' 
+                  isToday
+                    ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg'
                     : 'bg-white shadow-sm'
                 }`}>
                   <p className={`font-medium ${isToday ? 'text-white/80' : 'text-gray-500'}`}>{DAYS[i]}</p>
                   <p className={`text-2xl md:text-3xl font-bold mt-1 ${isToday ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[i])}</p>
                 </div>
-                
+
                 <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                  {dayMeals.map(meal => (
-                    <div key={meal.id} className="bg-pastel-peach/60 rounded px-2 py-1.5 text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                      <span>{meal.meal_type === 'lunch' ? '🍞' : '🍝'}</span>
-                      <span className="whitespace-normal">{meal.meal_name}</span>
-                    </div>
-                  ))}
                   {dayTasks.map(task => (
                     <TaskItem
                       key={task.id}
                       task={task}
-                      isCompleted={isTaskCompleted(task.id)}
                       onComplete={() => handleCompleteTask(task)}
                       onUncomplete={() => handleUncompleteTask(task)}
-                      onEdit={(t) => {
-                        setEditTask(t)
-                        setShowModal(true)
-                      }}
                       users={users}
                       isToday={isToday}
                       presentationMode={true}
                     />
+                  ))}
+                  {dayGhosts.map(ghost => (
+                    <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
                   ))}
                   {!hasItems && (
                     <div className="text-center text-gray-400 py-8 text-sm">
@@ -335,6 +234,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           })}
         </div>
 
+        {/* Mobile: swipeable day tabs */}
         <div className="flex-1 md:hidden flex flex-col overflow-hidden">
           <div className="flex gap-2 overflow-x-auto pb-2 mb-3 snap-x">
             {DAYS.map((day, i) => {
@@ -357,45 +257,44 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               )
             })}
           </div>
-          
+
           <div className="flex-1 overflow-y-auto bg-white/60 rounded-2xl">
             <div className={`text-center p-3 transition-all duration-300 ${
               activeDay === currentDayIndex && currentWeekOffset === 0
-                ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg rounded-t-2xl' 
+                ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg rounded-t-2xl'
                 : 'bg-white shadow-sm rounded-t-2xl'
             }`}>
               <p className={`font-medium ${activeDay === currentDayIndex && currentWeekOffset === 0 ? 'text-white/80' : 'text-gray-500'}`}>{DAY_NAMES[activeDay]}</p>
               <p className={`text-3xl font-bold mt-1 ${activeDay === currentDayIndex && currentWeekOffset === 0 ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[activeDay])}</p>
             </div>
-            
+
             <div className="p-3 space-y-2">
-              {getMealsForDay(activeDay).map(meal => (
-                <div key={meal.id} className="bg-pastel-peach/60 rounded-xl px-3 py-2.5 text-base font-medium text-gray-700 flex items-center gap-2">
-                  <span>{meal.meal_type === 'lunch' ? '🍞' : '🍝'}</span>
-                  <span className="whitespace-normal">{meal.meal_name}</span>
-                </div>
-              ))}
-              {getTasksForDay(activeDay).map(task => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  isCompleted={isTaskCompleted(task.id)}
-                  onComplete={() => handleCompleteTask(task)}
-                  onUncomplete={() => handleUncompleteTask(task)}
-                  onEdit={(t) => {
-                    setEditTask(t)
-                    setShowModal(true)
-                  }}
-                  users={users}
-                  isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
-                  presentationMode={true}
-                />
-              ))}
-              {(getTasksForDay(activeDay).length === 0 && getMealsForDay(activeDay).length === 0) && (
-                <div className="text-center text-gray-400 py-8">
-                  Geen taken
-                </div>
-              )}
+              {(() => {
+                const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(activeDay)
+                return (
+                  <>
+                    {dayTasks.map(task => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        onComplete={() => handleCompleteTask(task)}
+                        onUncomplete={() => handleUncompleteTask(task)}
+                        users={users}
+                        isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
+                        presentationMode={true}
+                      />
+                    ))}
+                    {dayGhosts.map(ghost => (
+                      <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
+                    ))}
+                    {dayTasks.length === 0 && dayGhosts.length === 0 && (
+                      <div className="text-center text-gray-400 py-8">
+                        Geen taken
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </div>
         </div>
@@ -423,11 +322,11 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          
+
           <div className="text-center">
-            <h1 className="text-lg font-semibold text-gray-800">Divide/Chores</h1>
+            <h1 className="text-lg font-semibold text-gray-800">Huishouden</h1>
             <div className="flex items-center justify-center gap-2 mt-0.5">
-              <button 
+              <button
                 onClick={() => setCurrentWeekOffset(prev => prev - 1)}
                 className="p-1 hover:bg-white/50 rounded"
               >
@@ -436,7 +335,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 </svg>
               </button>
               <p className="text-gray-400 text-xs">{getWeekRange()}</p>
-              <button 
+              <button
                 onClick={() => setCurrentWeekOffset(prev => prev + 1)}
                 className="p-1 hover:bg-white/50 rounded"
               >
@@ -446,7 +345,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               </button>
             </div>
           </div>
-          
+
           <button onClick={onTogglePresentation} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors" title="Presentatie modus">
             <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -459,8 +358,8 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             <button
               onClick={() => setFilter('all')}
               className={`filter-btn flex items-center justify-center gap-1.5 ${
-                filter === 'all' 
-                  ? 'bg-accent-mint text-white shadow-soft' 
+                filter === 'all'
+                  ? 'bg-accent-mint text-white shadow-soft'
                   : 'text-gray-500 hover:bg-white/50'
               }`}
             >
@@ -473,8 +372,8 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                   key={u.id}
                   onClick={() => setFilter(u.id)}
                   className={`filter-btn flex items-center justify-center gap-1.5 ${
-                    filter === u.id 
-                      ? 'bg-accent-mint text-white shadow-soft' 
+                    filter === u.id
+                      ? 'bg-accent-mint text-white shadow-soft'
                       : 'text-gray-500 hover:bg-white/50'
                   }`}
                 >
@@ -492,19 +391,19 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
       <div className="px-3 py-4">
         <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
           {DAYS.map((day, i) => {
-            const dayTasks = getTasksForDay(i)
+            const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(i)
             const isActive = i === activeDay
             const isToday = i === currentDayIndex && currentWeekOffset === 0
-            const hasTasks = dayTasks.length > 0
+            const hasTasks = dayTasks.length > 0 || dayGhosts.length > 0
 
             return (
               <button
                 key={i}
                 onClick={() => setActiveDay(i)}
                 className={`day-tab min-w-[48px] ${
-                  isActive 
-                    ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-soft' 
-                    : isToday 
+                  isActive
+                    ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-soft'
+                    : isToday
                       ? 'bg-white shadow-card text-gray-700'
                       : 'bg-white/50 text-gray-500 hover:bg-white'
                 }`}
@@ -532,66 +431,50 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           )}
         </div>
 
-        {getMealsForDay(activeDay).length > 0 && (
-          <div className="mb-6">
-            <div className="space-y-2">
-              {getMealsForDay(activeDay).map(meal => (
-                <div key={meal.id} className="flex items-center justify-between bg-pastel-peach/30 rounded-xl p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{meal.meal_type === 'lunch' ? '🍞' : '🍝'}</span>
-                    <span className="text-gray-700">{meal.meal_name}</span>
-                  </div>
-                  <button 
-                    onClick={() => deleteMeal(meal.id)}
-                    className="text-gray-400 hover:text-red-400 p-1"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
         <div className="space-y-3">
-          {getTasksForDay(activeDay).map(task => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              isCompleted={isTaskCompleted(task.id)}
-              onComplete={() => handleCompleteTask(task)}
-              onUncomplete={() => handleUncompleteTask(task)}
-              onEdit={(t) => {
-                setEditTask(t)
-                setShowModal(true)
-              }}
-              onDelete={() => handleDeleteTask(task)}
-              onDeleteAttempt={() => setResetKey(k => k + 1)}
-              users={users}
-              isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
-              presentationMode={false}
-              resetKey={resetKey}
-            />
-          ))}
-          {getTasksForDay(activeDay).length === 0 && (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-pastel-lavender/50 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                <svg className="w-8 h-8 text-pastel-lavenderDark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              </div>
-              <p className="text-gray-400">Geen taken voor deze dag</p>
-              <p className="text-gray-300 text-sm mt-1">Druk op + om een taak toe te voegen</p>
-            </div>
-          )}
+          {(() => {
+            const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(activeDay)
+            const isToday = activeDay === currentDayIndex && currentWeekOffset === 0
+            return (
+              <>
+                {dayTasks.map(task => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    onComplete={() => handleCompleteTask(task)}
+                    onUncomplete={() => handleUncompleteTask(task)}
+                    onEdit={!task.schedule_id ? (t) => { setEditTask(t); setShowModal(true) } : undefined}
+                    onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
+                    onDeleteAttempt={() => setResetKey(k => k + 1)}
+                    users={users}
+                    isToday={isToday}
+                    presentationMode={false}
+                    resetKey={resetKey}
+                  />
+                ))}
+                {dayGhosts.map(ghost => (
+                  <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={false} />
+                ))}
+                {dayTasks.length === 0 && dayGhosts.length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-pastel-lavender/50 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-pastel-lavenderDark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-400">Geen taken voor deze dag</p>
+                    <p className="text-gray-300 text-sm mt-1">Druk op + om een taak toe te voegen</p>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       </div>
 
       <button
         onClick={() => {
-          setSelectedDay(activeDay)
+          setEditTask(null)
           setShowModal(true)
         }}
         className="fixed bottom-20 right-6 w-14 h-14 bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white rounded-2xl shadow-soft-lg flex items-center justify-center text-2xl active:scale-95 transition-all hover:shadow-soft-lg"
@@ -603,18 +486,16 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
       {showModal && (
         <TaskModal
-          dayIndex={editTask?.day_of_week ?? selectedDay ?? activeDay}
-          dayName={DAY_NAMES[editTask?.day_of_week ?? selectedDay ?? activeDay]}
+          date={editTask?.date || formatDateISO(weekDates[activeDay])}
+          dayName={DAY_NAMES[activeDay]}
           onClose={() => {
             setShowModal(false)
-            setSelectedDay(null)
             setEditTask(null)
           }}
           users={users}
           currentUser={currentUser}
-          onTaskCreated={loadTasks}
+          onTaskCreated={loadData}
           editTask={editTask}
-          onMealAdded={(name, type) => addMeal(editTask?.day_of_week ?? selectedDay ?? activeDay, name, type)}
         />
       )}
     </div>

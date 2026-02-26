@@ -34,5 +34,5 @@ if (fs.existsSync(distPath)) {
 await initDb()
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Divide/Chores server running on port ${PORT}`)
+  console.log(`Huishouden server running on port ${PORT}`)
 })

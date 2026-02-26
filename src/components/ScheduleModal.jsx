@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import { getUserColor, BOTH_COLOR } from '../lib/colors'
 
 const PRESET_INTERVALS = [
   { days: 1, label: 'Elke dag' },
@@ -13,23 +14,25 @@ const PRESET_INTERVALS = [
   { days: 90, label: 'Elke 3 maanden' },
 ]
 
-export default function IntervalTaskModal({ onClose, currentUser, editTask, onSaved }) {
-  const [title, setTitle] = useState(editTask?.title || '')
-  const [category, setCategory] = useState(editTask?.category || '')
-  const [intervalDays, setIntervalDays] = useState(editTask?.interval_days || 7)
+export default function ScheduleModal({ onClose, currentUser, users, editSchedule, onSaved }) {
+  const [title, setTitle] = useState(editSchedule?.title || '')
+  const [category, setCategory] = useState(editSchedule?.category || '')
+  const [intervalDays, setIntervalDays] = useState(editSchedule?.interval_days || 7)
   const [customInterval, setCustomInterval] = useState(false)
+  const [assignedTo, setAssignedTo] = useState(editSchedule?.assigned_to || null)
+  const [isBoth, setIsBoth] = useState(editSchedule?.is_both || false)
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const [showNewCategory, setShowNewCategory] = useState(false)
 
-  const isEditing = !!editTask
+  const isEditing = !!editSchedule
 
   useEffect(() => {
     loadCategories()
   }, [])
 
   useEffect(() => {
-    // If the current interval doesn't match any preset, show custom input
     if (!PRESET_INTERVALS.some(p => p.days === intervalDays)) {
       setCustomInterval(true)
     }
@@ -37,7 +40,7 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
 
   async function loadCategories() {
     try {
-      const cats = await api.getIntervalTaskCategories()
+      const cats = await api.getScheduleCategories()
       setCategories(cats)
     } catch (err) {
       console.error('Failed to load categories:', err)
@@ -52,23 +55,28 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
 
     try {
       if (isEditing) {
-        await api.updateIntervalTask(editTask.id, {
+        await api.updateSchedule(editSchedule.id, {
           title: title.trim(),
           category: category.trim(),
           interval_days: intervalDays,
+          assigned_to: isBoth ? null : assignedTo,
+          is_both: isBoth,
         })
       } else {
-        await api.createIntervalTask({
+        await api.createSchedule({
           title: title.trim(),
           category: category.trim(),
           interval_days: intervalDays,
+          assigned_to: isBoth ? null : assignedTo,
+          is_both: isBoth,
           created_by: currentUser.id,
+          start_date: startDate,
         })
       }
       onSaved()
       onClose()
     } catch (err) {
-      console.error('Failed to save interval task:', err)
+      console.error('Failed to save schedule:', err)
     }
 
     setLoading(false)
@@ -76,19 +84,20 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
 
   async function handleDelete(e) {
     e.preventDefault()
-    if (!confirm('Weet je zeker dat je deze taak wilt verwijderen?')) return
+    if (!confirm('Weet je zeker dat je dit schema wilt verwijderen? Alle bijbehorende taken worden ook verwijderd.')) return
 
     setLoading(true)
     try {
-      await api.deleteIntervalTask(editTask.id)
+      await api.deleteSchedule(editSchedule.id)
       onSaved()
       onClose()
     } catch (err) {
-      console.error('Failed to delete interval task:', err)
+      console.error('Failed to delete schedule:', err)
     }
     setLoading(false)
   }
 
+  const existingCategories = categories.filter(c => c !== category)
   const allCategories = [...new Set([...categories, ...(category && !categories.includes(category) ? [category] : [])])]
 
   return (
@@ -100,7 +109,7 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
         <div className="p-5 border-b border-gray-100">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-800">
-              {isEditing ? 'Taak wijzigen' : 'Herhalende taak'}
+              {isEditing ? 'Schema wijzigen' : 'Nieuw schema'}
             </h2>
             <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,6 +120,7 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-2">Taak</label>
             <input
@@ -124,9 +134,10 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
             />
           </div>
 
+          {/* Category */}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-2">Categorie</label>
-            {allCategories.length > 0 && !showNewCategory ? (
+            {existingCategories.length > 0 && !showNewCategory ? (
               <div className="space-y-2">
                 <div className="flex gap-2 flex-wrap">
                   {allCategories.map(cat => (
@@ -170,7 +181,7 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
                   placeholder="Bijv. Beneden, Boven, Keuken..."
                   className="input-field flex-1"
                 />
-                {allCategories.length > 0 && (
+                {existingCategories.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setShowNewCategory(false)}
@@ -183,6 +194,7 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
             )}
           </div>
 
+          {/* Interval */}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-2">Herhaling</label>
             {!customInterval ? (
@@ -229,7 +241,6 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
                   type="button"
                   onClick={() => {
                     setCustomInterval(false)
-                    // Snap to nearest preset
                     const nearest = PRESET_INTERVALS.reduce((a, b) =>
                       Math.abs(b.days - intervalDays) < Math.abs(a.days - intervalDays) ? b : a
                     )
@@ -243,6 +254,65 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
             )}
           </div>
 
+          {/* Assignment */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Toewijzing</label>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => { setIsBoth(true); setAssignedTo(null) }}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  isBoth
+                    ? `${BOTH_COLOR.bg} ${BOTH_COLOR.text} shadow-soft`
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                Samen
+              </button>
+              {users.map(user => {
+                const color = getUserColor(user)
+                const isSelected = !isBoth && assignedTo === user.id
+                return (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => { setIsBoth(false); setAssignedTo(user.id) }}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                      isSelected
+                        ? `${color.bg} text-white shadow-soft`
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    {user.name}
+                  </button>
+                )
+              })}
+              {!isBoth && assignedTo && (
+                <button
+                  type="button"
+                  onClick={() => { setAssignedTo(null) }}
+                  className="text-xs text-gray-400 hover:text-gray-600 self-center"
+                >
+                  Niemand
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Start date (only for new schedules) */}
+          {!isEditing && (
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Startdatum</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="input-field"
+              />
+              <p className="text-xs text-gray-400 mt-1">De eerste taak wordt op deze datum aangemaakt</p>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading || !title.trim()}
@@ -253,7 +323,7 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-            ) : isEditing ? 'Wijzigingen opslaan' : 'Taak toevoegen'}
+            ) : isEditing ? 'Wijzigingen opslaan' : 'Schema toevoegen'}
           </button>
 
           {isEditing && (
@@ -263,7 +333,7 @@ export default function IntervalTaskModal({ onClose, currentUser, editTask, onSa
               disabled={loading}
               className="w-full py-3 text-red-500 font-medium text-sm hover:bg-red-50 rounded-xl transition-colors"
             >
-              Taak verwijderen
+              Schema verwijderen
             </button>
           )}
         </form>

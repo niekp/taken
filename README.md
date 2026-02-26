@@ -1,258 +1,228 @@
-# Divide/Chores 🏠
+# Taken
 
-Een takenlijst app voor het huishouden van Bijan en Esther.
-
----
-
-## Live URL
-
-**https://bijanamirhojat.github.io/divide-chores/**
-
-Presentatie modus: **https://bijanamirhojat.github.io/divide-chores/?mode=presentation**
+Een self-hosted huishoudtaken app met weekplanning, herhalende taken en maaltijdplanning. UI volledig in het Nederlands.
 
 ---
 
 ## Technische Stack
 
-- **Frontend**: React 18 + Vite
-- **Styling**: Tailwind CSS
-- **Backend/DB**: Supabase (PostgreSQL)
-- **Auth**: PIN-based (gedeeld)
-- **Hosting**: GitHub Pages
+- **Frontend**: React 18 + Vite + Tailwind CSS
+- **Backend**: Express.js (Node)
+- **Database**: SQLite (better-sqlite3)
+- **Infra**: Docker, GHCR (`ghcr.io/niekp/taken`)
+- **Auth**: PIN-based login
+- **PWA**: Installeerbaar op mobiel (vite-plugin-pwa)
+
+---
+
+## Snel starten
+
+### Docker (productie)
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+De app draait op `http://localhost:3000`. Data wordt opgeslagen in `./data/chores.db`.
+
+### Docker (development)
+
+```bash
+docker compose up --watch
+```
+
+Wijzigingen in `server/` en `src/` worden automatisch gesynchroniseerd.
+
+### Lokaal (zonder Docker)
+
+```bash
+npm install
+# Terminal 1: backend
+npm run dev:server
+# Terminal 2: frontend (Vite dev server op :5173, proxied naar :3000)
+npm run dev
+```
+
+### Gebruikers beheren
+
+```bash
+# Lokaal
+npm run cli
+
+# Via Docker
+./manage.sh
+```
+
+De CLI/manage.sh biedt opties om gebruikers toe te voegen, te verwijderen en PINs te resetten.
 
 ---
 
 ## Project Structuur
 
 ```
-divide-chores/
+taken/
+├── server/
+│   ├── index.js              # Express app (API + SPA serving)
+│   ├── routes.js             # Route wiring
+│   ├── db.js                 # SQLite init + migration runner
+│   ├── cli.js                # CLI voor gebruikersbeheer
+│   ├── controllers/
+│   │   ├── taskController.js
+│   │   ├── completedTaskController.js
+│   │   ├── intervalTaskController.js
+│   │   ├── mealController.js
+│   │   └── userController.js
+│   ├── repositories/
+│   │   ├── taskRepository.js
+│   │   ├── completedTaskRepository.js
+│   │   ├── intervalTaskRepository.js
+│   │   ├── mealRepository.js
+│   │   └── userRepository.js
+│   └── migrations/
+│       ├── 001-initial-schema.js
+│       ├── 002-add-user-color.js
+│       ├── 003-interval-tasks.js
+│       └── 004-remove-is-recurring.js
 ├── src/
+│   ├── App.jsx               # Root met tab-navigatie
 │   ├── components/
-│   │   ├── Login.jsx       # PIN login + naam selectie
-│   │   ├── WeekView.jsx    # Hoofdscherm met week/dag view
-│   │   ├── TaskItem.jsx    # Individuele taak component
-│   │   ├── TaskModal.jsx   # Modal om taken/eten toe te voegen
-│   │   ├── Menu.jsx        # Menu met history
-│   │   └── Confetti.jsx    # Animatie bij afronden taak
+│   │   ├── WeekView.jsx      # Weekoverzicht (hoofd scherm)
+│   │   ├── TaskItem.jsx      # Taak component
+│   │   ├── TaskModal.jsx     # Taak toevoegen/bewerken
+│   │   ├── IntervalTasksView.jsx  # Herhalende taken panel
+│   │   ├── IntervalTaskModal.jsx  # Herhalende taak modal
+│   │   ├── Login.jsx         # PIN login
+│   │   ├── Menu.jsx          # Hamburger menu
+│   │   ├── Stats.jsx         # Statistieken
+│   │   └── Confetti.jsx      # Animatie bij voltooiing
 │   ├── lib/
-│   │   └── supabase.js     # Supabase client
-│   ├── App.jsx             # Hoofdcomponent
-│   ├── main.jsx            # Entry point
-│   └── index.css           # Tailwind imports
-├── public/
-│   └── favicon.svg
-├── index.html
+│   │   ├── api.js            # API client
+│   │   └── colors.js         # Kleurenpalet
+│   ├── main.jsx
+│   └── index.css
+├── Dockerfile                # Multi-stage build
+├── docker-compose.yml        # Dev (met watch)
+├── docker-compose.prod.yml   # Productie (GHCR image)
+├── manage.sh                 # Bash TUI voor containerbeheer
 ├── package.json
 ├── vite.config.js
-├── tailwind.config.js
-├── postcss.config.js
-└── .env                    # Supabase credentials (NIET committen)
+└── tailwind.config.js
 ```
 
 ---
 
-## Database Schema (Supabase)
+## Database Schema (SQLite)
 
-### `users` tabel
+### `users`
 | Kolom | Type | Beschrijving |
 |-------|------|--------------|
-| id | UUID | Primary key |
+| id | INTEGER | Primary key (autoincrement) |
+| name | TEXT | Gebruikersnaam |
 | pin | TEXT | PIN code |
-| name | TEXT | Naam (Bijan/Esther) |
 | avatar_url | TEXT | Profielfoto URL (optioneel) |
-| created_at | TIMESTAMP | Created at |
+| color | TEXT | Kleur key (`blue`, `pink`, `green`, `purple`, `orange`, `red`, `teal`, `yellow`) |
+| created_at | TEXT | Aangemaakt op |
 
-### `tasks` tabel
+### `tasks` (weektaken / schema's)
 | Kolom | Type | Beschrijving |
 |-------|------|--------------|
-| id | UUID | Primary key |
+| id | INTEGER | Primary key |
 | title | TEXT | Taak titel |
-| description | TEXT | Optionele beschrijving |
 | day_of_week | INTEGER | 0=ma, 6=zo |
-| assigned_to | UUID | FK naar users.id |
-| is_both | BOOLEAN | Samen doen |
-| is_recurring | BOOLEAN | Wekelijks herhalen |
-| created_by | UUID | FK naar users.id |
-| created_at | TIMESTAMP | Created at |
+| assigned_to | INTEGER | FK naar users.id |
+| is_both | INTEGER | Samen doen (0/1) |
+| created_by | INTEGER | FK naar users.id |
+| created_at | TEXT | Aangemaakt op |
 
-### `completed_tasks` tabel
+Alle weektaken herhalen automatisch elke week. Niet-voltooide taken verschuiven naar vandaag met een "achterstallig" badge.
+
+### `completed_tasks`
 | Kolom | Type | Beschrijving |
 |-------|------|--------------|
-| id | UUID | Primary key |
-| task_id | UUID | FK naar tasks.id |
-| user_id | UUID | FK naar users.id |
-| week_number | INTEGER | Weeknummer |
+| id | INTEGER | Primary key |
+| task_id | INTEGER | FK naar tasks.id |
+| user_id | INTEGER | FK naar users.id |
+| week_number | INTEGER | ISO weeknummer |
 | year | INTEGER | Jaar |
-| completed_at | TIMESTAMP | Wanneer voltooid |
+| completed_at | TEXT | Wanneer voltooid |
 
-### `meals` tabel
+### `interval_tasks` (herhalende taken)
 | Kolom | Type | Beschrijving |
 |-------|------|--------------|
-| id | UUID | Primary key |
+| id | INTEGER | Primary key |
+| title | TEXT | Taak titel |
+| category | TEXT | Categorie |
+| interval_days | INTEGER | Interval in dagen |
+| assigned_to | INTEGER | FK naar users.id (optioneel) |
+| created_at | TEXT | Aangemaakt op |
+
+### `interval_completions`
+| Kolom | Type | Beschrijving |
+|-------|------|--------------|
+| id | INTEGER | Primary key |
+| task_id | INTEGER | FK naar interval_tasks.id |
+| user_id | INTEGER | FK naar users.id |
+| completed_at | TEXT | Wanneer voltooid |
+
+### `meals`
+| Kolom | Type | Beschrijving |
+|-------|------|--------------|
+| id | INTEGER | Primary key |
 | day_of_week | INTEGER | 0=ma, 6=zo |
 | meal_name | TEXT | Naam van het eten |
-| meal_type | TEXT | 'lunch' of 'dinner' |
+| meal_type | TEXT | `lunch` of `dinner` |
 | week_number | INTEGER | Weeknummer |
 | year | INTEGER | Jaar |
-| created_at | TIMESTAMP | Created at |
+| created_at | TEXT | Aangemaakt op |
 
 ---
 
-## Hoe te Draaien
+## Concepten
 
-### Lokaal Ontwikkelen
+### Weektaken (schema's)
+Taken worden ingesteld op een vaste dag van de week en herhalen automatisch elke week. Het voltooien wordt bijgehouden per week via `completed_tasks` (gebaseerd op `task_id + week_number + year`). Als een taak niet is voltooid en de dag is verstreken (in de huidige week), verschijnt de taak bij vandaag met een "X dagen achterstallig" badge.
 
-```bash
-cd divide-chores
-npm install
-npm run dev
-```
+### Herhalende taken (interval)
+Taken met een vast interval (bijv. elke 14 dagen). De vervaldatum wordt berekend als `laatste_voltooiing + interval_days`. Status: achterstallig (rood), vandaag (oranje), of gepland (grijs). Deze taken worden beheerd in het "Herhalend" tabblad, maar verschijnen ook in het weekoverzicht op hun vervaldatum.
 
-Dit start de dev server op http://localhost:5173
-
-**Let op**: Maak een `.env` bestand aan in de project root:
-```
-VITE_SUPABASE_URL=jouw_supabase_url
-VITE_SUPABASE_ANON_KEY=jouw_anon_key
-```
-
-### Bouwen voor Productie
-
-```bash
-npm run build
-```
-
-Dit maakt een `dist` folder die naar GitHub Pages kan worden gedeployed.
-
-### PWA Installeren
-
-Op mobiel kun je de app installeren als native app:
-- **iOS**: Open in Safari → Delen → "Zet op beginscherm"
-- **Android**: Open in Chrome → Menu → "App installeren" of "Toevoegen aan beginscherm"
-
-Het icoon gebruikt `app_icon.jpeg` uit de `public` folder.
+### Kleuren
+Elke gebruiker heeft een kleur uit een vast palet. Kleuren worden gebruikt in de UI voor taaktoewijzing en filters. De beschikbare kleuren: `blue`, `pink`, `green`, `purple`, `orange`, `red`, `teal`, `yellow`.
 
 ---
 
-## Deployen naar GitHub Pages
+## Gebruik
 
-De repo heeft een GitHub Action workflow die automatisch bouwt bij elke push naar main.
+1. Open de app en voer je PIN in
+2. Navigeer tussen dagen in het weekoverzicht
+3. Tik op "+" om een taak of maaltijd toe te voegen
+4. Tik op een taak om af te vinken (met confetti)
+5. Swipe naar links om te verwijderen
+6. Wissel naar "Herhalend" voor interval-taken
+7. Gebruik het menu voor statistieken en presentatiemodus
 
-**Belangrijk**: Voeg de volgende GitHub Secrets toe in repo Settings > Secrets and variables > Actions:
-- `VITE_SUPABASE_URL` - Je Supabase project URL
-- `VITE_SUPABASE_ANON_KEY` - Je Supabase anon key
+### Presentatiemodus
+Voeg `?mode=presentation` toe aan de URL voor een week-overzicht op groot scherm. Beschikbaar via het menu.
 
----
-
-## Gebruik van de App
-
-1. Open de URL
-2. Voer PIN in (zie Supabase database)
-3. Selecteer je naam (Bijan of Esther)
-4. Navigeer tussen dagen met de pijltjes bovenin
-5. Tik op "+" om taak of eten toe te voegen
-6. Tik op een taak om af te vinken (met confetti animatie)
-7. Swipe naar links op een taak om te verwijderen
-8. Gebruik het menu (hamburger linksboven) voor:
-   - Voltooide taken history
-   - Presentatie modus (week view op groot scherm)
-   - Uitloggen
-
-### Taak toevoegen
-1. Klik op "+"
-2. Kies "Taak" of "Eten" met de toggle bovenaan
-3. Vul de details in
-4. Optioneel: voeg tegelijk eten toe voor die dag
-
-### Eten toevoegen
-1. Klik op "+" → kies "Eten"
-2. Of voeg het toe via de taak-modal
-
-### Statistieken bekijken
-1. Open het menu (hamburger linksboven)
-2. Klik op "Statistieken"
-3. Kies een periode: Week, Maand, Jaar, of Alle tijden
-4. Bekijk statistieken per persoon en meest voltooide taken
+### PWA
+Op mobiel installeerbaar:
+- **iOS**: Safari > Delen > "Zet op beginscherm"
+- **Android**: Chrome > Menu > "App installeren"
 
 ---
 
 ## Features
 
-- ✅ Taken zijn voor iedereen afgevinkt (één persoon hoeft maar af te vinken)
-- ✅ Mobile-first design
-- ✅ Numeriek toetsenbord voor PIN invoer
-- ✅ Week view in presentatie modus
-- ✅ Presentatie modus ook op mobiel (dag-carousel)
-- ✅ Taken toewijzen aan Bijan, Esther, of samen
-- ✅ Repeterende taken (wekelijks herhalen of éénmalig)
-- ✅ Confetti animatie bij afronden taak
-- ✅ Filter op persoon
-- ✅ Indicator bij dagen met taken
-- ✅ Voltooide taken history
-- ✅ Presentatie modus voor groot scherm (via URL `?mode=presentation`)
-- ✅ Meal planning (lunch/diner per dag)
-- ✅ Swipe om taak te verwijderen
-- ✅ Week navigatie in presentatie modus
-- ✅ Profielfoto's instellen (via menu)
-- ✅ PWA ondersteuning (opslaan op homescherm)
-- ✅ PWA auto-update (altijd nieuwste versie)
-- ✅ Statistieken (week/maand/jaar/alle tijden)
-
----
-
-## Troubleshooting
-
-### App laadt niet na deploy
-- Wacht 1-2 minuten tot GitHub Pages klaar is met bouwen
-- Check of de GitHub secrets correct zijn ingesteld
-
-### Database problemen
-- Ga naar Supabase dashboard > Table Editor
-- Check of de tabellen correct zijn aangemaakt
-- Controleer de RLS policies
-- Voor profielfoto's: voeg een `avatar_url` kolom (type TEXT) toe aan de `users` tabel
-
-### PIN werkt niet
-- Controleer of gebruikers bestaan in Supabase:
-  ```sql
-  SELECT * FROM users;
-  ```
-
-### PWA laadt oude versie
-- De app checkt automatisch op nieuwe versies bij het openen
-- Als je een oude versie ziet, sluit de app dan af en open opnieuw
-- Of verwijder de app van je homescherm en voeg opnieuw toe
-
----
-
-## Versie History
-
-- **v1.5** (feb 2026): 
-  - Taken zijn nu voor iedereen afgevinkt (niet per gebruiker)
-  - Auto-refresh bij app openen
-  - Numeriek toetsenbord voor PIN invoer
-  - PWA auto-update (altijd nieuwste versie)
-
-- **v1.4** (feb 2026): 
-  - Statistieken feature (week/maand/jaar/alle tijden)
-  - Profielfoto's zichtbaar bij taken en filters
-  - Betere mobile presentatie modus
-
-- **v1.2** (feb 2026): 
-  - Profielfoto's instellen per gebruiker
-  - Presentatie modus ook op mobiel (dag-carousel)
-  - PWA ondersteuning (app icon, homescherm)
-
-- **v1.1** (feb 2026): 
-  - Meal planning feature
-  - Presentatie modus via URL parameter
-  - Swipe to delete taken
-  - Non-recurring taken (éénmalig)
-  - Week navigatie in presentatie modus
-  - Betere mobile UX
-
-- **v1.0** (feb 2026): Initiele release
-  - PIN login
-  - Week/dag view
-  - Taak toewijzing
-  - Confetti animatie
+- Weektaken met automatische herhaling
+- Achterstallige taken verschuiven naar vandaag
+- Herhalende taken met instelbaar interval
+- Maaltijdplanning (lunch/diner per dag)
+- Taken toewijzen aan gebruikers of "samen"
+- PIN-based login
+- Confetti animatie bij voltooiing
+- Statistieken (week/maand/jaar/alle tijden)
+- Presentatiemodus (groot scherm)
+- Swipe-to-delete
+- PWA met auto-update
+- Profielfoto's
+- Gebruikerskleuren
+- Docker deployment via GHCR

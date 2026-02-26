@@ -31,8 +31,29 @@ export const api = {
     body: JSON.stringify({ currentPin, newPin }),
   }),
 
+  // Schedules
+  getSchedules: () => request('/schedules'),
+
+  getSchedule: (id) => request(`/schedules/${id}`),
+
+  createSchedule: (schedule) => request('/schedules', {
+    method: 'POST',
+    body: JSON.stringify(schedule),
+  }),
+
+  updateSchedule: (id, updates) => request(`/schedules/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  }),
+
+  deleteSchedule: (id) => request(`/schedules/${id}`, {
+    method: 'DELETE',
+  }),
+
+  getScheduleCategories: () => request('/schedules/categories'),
+
   // Tasks
-  getTasks: () => request('/tasks'),
+  getTasks: (from, to) => request(`/tasks?from=${from}&to=${to}`),
 
   createTask: (task) => request('/tasks', {
     method: 'POST',
@@ -48,63 +69,38 @@ export const api = {
     method: 'DELETE',
   }),
 
-  // Completed Tasks
-  getCompletedTasks: (weekNumber, year) =>
-    request(`/completed-tasks?week_number=${weekNumber}&year=${year}`),
-
-  completeTask: (data) => request('/completed-tasks', {
+  completeTask: (id, userId) => request(`/tasks/${id}/complete`, {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ user_id: userId }),
   }),
 
-  uncompleteTask: (taskId, weekNumber, year) =>
-    request(`/completed-tasks?task_id=${taskId}&week_number=${weekNumber}&year=${year}`, {
-      method: 'DELETE',
-    }),
+  uncompleteTask: (id) => request(`/tasks/${id}/uncomplete`, {
+    method: 'POST',
+  }),
 
-  getHistory: (limit = 50) => request(`/completed-tasks/history?limit=${limit}`),
+  runHousekeeping: () => request('/tasks/housekeeping', {
+    method: 'POST',
+  }),
 
-  getStats: (period) => request(`/completed-tasks/stats?period=${period}`),
+  getHistory: (limit = 50) => request(`/tasks/history?limit=${limit}`),
+
+  getStats: (period) => request(`/tasks/stats?period=${period}`),
 
   // Meals
-  getMeals: (weekNumber, year) =>
-    request(`/meals?week_number=${weekNumber}&year=${year}`),
+  getMeals: (from, to) =>
+    request(`/meals?from=${from}&to=${to}`),
 
   createMeal: (meal) => request('/meals', {
     method: 'POST',
     body: JSON.stringify(meal),
   }),
 
-  deleteMeal: (id) => request(`/meals/${id}`, {
-    method: 'DELETE',
-  }),
-
-  // Interval Tasks
-  getIntervalTasks: () => request('/interval-tasks'),
-
-  getIntervalTask: (id) => request(`/interval-tasks/${id}`),
-
-  createIntervalTask: (task) => request('/interval-tasks', {
-    method: 'POST',
-    body: JSON.stringify(task),
-  }),
-
-  updateIntervalTask: (id, updates) => request(`/interval-tasks/${id}`, {
+  updateMeal: (id, updates) => request(`/meals/${id}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   }),
 
-  deleteIntervalTask: (id) => request(`/interval-tasks/${id}`, {
+  deleteMeal: (id) => request(`/meals/${id}`, {
     method: 'DELETE',
   }),
-
-  completeIntervalTask: (id, userId) => request(`/interval-tasks/${id}/complete`, {
-    method: 'POST',
-    body: JSON.stringify({ user_id: userId }),
-  }),
-
-  getIntervalTaskHistory: (id, limit = 10) =>
-    request(`/interval-tasks/${id}/history?limit=${limit}`),
-
-  getIntervalTaskCategories: () => request('/interval-tasks/categories'),
 }

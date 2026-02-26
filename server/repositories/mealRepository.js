@@ -1,19 +1,25 @@
 import { getDb, generateId } from '../db.js'
 
-export function findByWeek(weekNumber, year) {
+export function findByDateRange(from, to) {
   const db = getDb()
   return db.prepare(
-    'SELECT * FROM meals WHERE week_number = ? AND year = ? ORDER BY day_of_week'
-  ).all(Number(weekNumber), Number(year))
+    'SELECT * FROM meals WHERE date >= ? AND date <= ? ORDER BY date'
+  ).all(from, to)
 }
 
-export function create({ day_of_week, meal_name, meal_type, week_number, year }) {
+export function create({ date, meal_name }) {
   const db = getDb()
   const id = generateId()
   db.prepare(`
-    INSERT INTO meals (id, day_of_week, meal_name, meal_type, week_number, year)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, day_of_week, meal_name, meal_type, week_number, year)
+    INSERT INTO meals (id, date, meal_name)
+    VALUES (?, ?, ?)
+  `).run(id, date, meal_name)
+  return db.prepare('SELECT * FROM meals WHERE id = ?').get(id)
+}
+
+export function update(id, { meal_name }) {
+  const db = getDb()
+  db.prepare('UPDATE meals SET meal_name = ? WHERE id = ?').run(meal_name, id)
   return db.prepare('SELECT * FROM meals WHERE id = ?').get(id)
 }
 

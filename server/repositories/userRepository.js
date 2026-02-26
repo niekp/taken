@@ -49,8 +49,6 @@ export function updatePin(id, newPin) {
 
 export function remove(id) {
   const db = getDb()
-  db.prepare('DELETE FROM completed_tasks WHERE user_id = ?').run(id)
-  db.prepare('UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?').run(id)
-  db.prepare('UPDATE tasks SET created_by = NULL WHERE created_by = ?').run(id)
+  // FK ON DELETE SET NULL handles tasks.assigned_to, tasks.completed_by, schedules.assigned_to, schedules.created_by
   db.prepare('DELETE FROM users WHERE id = ?').run(id)
 }

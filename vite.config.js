@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'app_icon.jpeg'],
       manifest: {
-        name: 'Divide/Chores',
-        short_name: 'Divide/Chores',
+        name: 'Huishouden',
+        short_name: 'Huishouden',
         description: 'Takenlijst app voor het huishouden',
         start_url: '/',
         display: 'standalone',

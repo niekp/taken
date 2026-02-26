@@ -1,0 +1,257 @@
+import { useState, useEffect } from 'react'
+import { api } from '../lib/api'
+
+const DAY_NAMES = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
+const DAY_SHORT = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
+
+function formatDateISO(d) {
+  return d.toISOString().split('T')[0]
+}
+
+function getDays() {
+  const days = []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() + i)
+    days.push(d)
+  }
+  return days
+}
+
+export default function MealsView({ onOpenMenu, presentationMode, onTogglePresentation }) {
+  const [meals, setMeals] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingDate, setEditingDate] = useState(null)
+  const [editingMealId, setEditingMealId] = useState(null)
+  const [inputValue, setInputValue] = useState('')
+
+  const days = getDays()
+
+  useEffect(() => {
+    loadMeals()
+
+    function handleVisibilityChange() {
+      if (!document.hidden) loadMeals()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
+  async function loadMeals() {
+    const from = formatDateISO(days[0])
+    const to = formatDateISO(days[6])
+    try {
+      const data = await api.getMeals(from, to)
+      setMeals(data)
+    } catch (err) {
+      console.error('Failed to load meals:', err)
+    }
+    setLoading(false)
+  }
+
+  function getMealForDate(dateStr) {
+    return meals.find(m => m.date === dateStr)
+  }
+
+  function startAdding(dateStr) {
+    setEditingDate(dateStr)
+    setEditingMealId(null)
+    setInputValue('')
+  }
+
+  function startEditing(meal) {
+    setEditingDate(meal.date)
+    setEditingMealId(meal.id)
+    setInputValue(meal.meal_name)
+  }
+
+  function cancelEditing() {
+    setEditingDate(null)
+    setEditingMealId(null)
+    setInputValue('')
+  }
+
+  async function handleSave(dateStr) {
+    if (!inputValue.trim()) return
+
+    try {
+      if (editingMealId) {
+        await api.updateMeal(editingMealId, { meal_name: inputValue.trim() })
+      } else {
+        await api.createMeal({ date: dateStr, meal_name: inputValue.trim() })
+      }
+      cancelEditing()
+      loadMeals()
+    } catch (err) {
+      console.error('Failed to save meal:', err)
+    }
+  }
+
+  async function handleDelete(mealId) {
+    try {
+      await api.deleteMeal(mealId)
+      loadMeals()
+    } catch (err) {
+      console.error('Failed to delete meal:', err)
+    }
+  }
+
+  function isToday(date) {
+    const today = new Date()
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-pastel-cream flex items-center justify-center">
+        <svg className="animate-spin w-8 h-8 text-pastel-mint" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-pastel-cream overflow-x-hidden">
+      <div className="sticky top-0 z-40 glass border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button onClick={onOpenMenu} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors">
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          <div className="text-center">
+            <h1 className="text-lg font-semibold text-gray-800">Eten plannen</h1>
+            <p className="text-gray-400 text-xs">Komende 7 dagen</p>
+          </div>
+
+          <button onClick={onTogglePresentation} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors" title="Presentatie modus">
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="px-4 py-4 pb-32 space-y-3">
+        {days.map(date => {
+          const dateStr = formatDateISO(date)
+          const meal = getMealForDate(dateStr)
+          const today = isToday(date)
+          const isEditing = editingDate === dateStr
+
+          return (
+            <div
+              key={dateStr}
+              className={`rounded-2xl overflow-hidden transition-all ${
+                today ? 'shadow-soft ring-2 ring-accent-mint/30' : 'shadow-card'
+              }`}
+            >
+              <div className={`px-4 py-3 flex items-center justify-between ${
+                today
+                  ? 'bg-gradient-to-r from-accent-mint to-pastel-mintDark text-white'
+                  : 'bg-white'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`text-center min-w-[40px] ${today ? 'text-white' : ''}`}>
+                    <p className={`text-xs font-medium ${today ? 'text-white/80' : 'text-gray-400'}`}>
+                      {DAY_SHORT[date.getDay()]}
+                    </p>
+                    <p className={`text-xl font-bold ${today ? 'text-white' : 'text-gray-800'}`}>
+                      {date.getDate()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={`font-medium ${today ? 'text-white' : 'text-gray-700'}`}>
+                      {DAY_NAMES[date.getDay()]}
+                    </p>
+                    {today && (
+                      <p className="text-xs text-white/70 font-medium">Vandaag</p>
+                    )}
+                  </div>
+                </div>
+
+                {!meal && !isEditing && (
+                  <button
+                    onClick={() => startAdding(dateStr)}
+                    className={`p-2 rounded-xl transition-colors ${
+                      today
+                        ? 'hover:bg-white/20 text-white/80'
+                        : 'hover:bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {isEditing ? (
+                <div className="bg-white px-4 py-3 border-t border-gray-100">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={inputValue}
+                      onChange={e => setInputValue(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleSave(dateStr)
+                        if (e.key === 'Escape') cancelEditing()
+                      }}
+                      placeholder="Wat eten we?"
+                      className="input-field flex-1"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleSave(dateStr)}
+                      disabled={!inputValue.trim()}
+                      className="px-4 py-2 bg-accent-mint text-white rounded-xl font-medium text-sm disabled:opacity-40 transition-all hover:opacity-90"
+                    >
+                      {editingMealId ? 'Opslaan' : 'Toevoegen'}
+                    </button>
+                    <button
+                      onClick={cancelEditing}
+                      className="px-3 py-2 text-gray-400 hover:text-gray-600 rounded-xl transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ) : meal ? (
+                <div className="bg-white px-4 py-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => startEditing(meal)}
+                      className="flex items-center gap-2 flex-1 text-left group"
+                    >
+                      <span className="text-lg">🍽️</span>
+                      <span className="text-gray-700 font-medium group-hover:text-accent-mint transition-colors">
+                        {meal.meal_name}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(meal.id)}
+                      className="p-1.5 text-gray-300 hover:text-red-400 rounded-lg transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

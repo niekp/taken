@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { api } from './lib/api'
 import Login from './components/Login'
 import WeekView from './components/WeekView'
-import IntervalTasksView from './components/IntervalTasksView'
+import SchedulesView from './components/SchedulesView'
+import MealsView from './components/MealsView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
 import Confetti from './components/Confetti'
@@ -10,7 +11,7 @@ import Confetti from './components/Confetti'
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
-  const [view, setView] = useState('weekly') // 'weekly' | 'interval'
+  const [view, setView] = useState('weekly') // 'weekly' | 'schedules' | 'meals'
   const [showMenu, setShowMenu] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
@@ -19,10 +20,26 @@ export default function App() {
     return params.get('mode') === 'presentation'
   })
   const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false)
+  const [isRestoringSession, setIsRestoringSession] = useState(true)
 
   useEffect(() => {
     loadUsers()
   }, [])
+
+  // Restore session from localStorage once users are loaded
+  useEffect(() => {
+    if (users.length === 0) return
+    const savedUserId = localStorage.getItem('currentUserId')
+    if (savedUserId && !currentUser) {
+      const user = users.find(u => String(u.id) === savedUserId)
+      if (user) {
+        setCurrentUser(user)
+      } else {
+        localStorage.removeItem('currentUserId')
+      }
+    }
+    setIsRestoringSession(false)
+  }, [users])
 
   useEffect(() => {
     if (presentationMode && users.length > 0) {
@@ -56,6 +73,7 @@ export default function App() {
       const data = await api.login(pin)
       if (data.length === 1) {
         setCurrentUser(data[0])
+        localStorage.setItem('currentUserId', String(data[0].id))
       }
       return data
     } catch (err) {
@@ -65,6 +83,7 @@ export default function App() {
 
   function handleSelectUser(user) {
     setCurrentUser(user)
+    localStorage.setItem('currentUserId', String(user.id))
   }
 
   async function handleUpdateUser(updates) {
@@ -79,11 +98,16 @@ export default function App() {
 
   function handleLogout() {
     setCurrentUser(null)
+    localStorage.removeItem('currentUserId')
   }
 
   function handleComplete() {
     setShowConfetti(true)
     setTimeout(() => setShowConfetti(false), 2000)
+  }
+
+  if (isRestoringSession) {
+    return null
   }
 
   if (!currentUser) {
@@ -109,8 +133,14 @@ export default function App() {
           onTogglePresentation={() => setPresentationMode(!presentationMode)}
           onOpenMenu={() => setShowMenu(true)}
         />
+      ) : view === 'meals' ? (
+        <MealsView
+          onOpenMenu={() => setShowMenu(true)}
+          presentationMode={presentationMode}
+          onTogglePresentation={() => setPresentationMode(!presentationMode)}
+        />
       ) : (
-        <IntervalTasksView
+        <SchedulesView
           currentUser={currentUser}
           users={users}
           onOpenMenu={() => setShowMenu(true)}
@@ -134,15 +164,26 @@ export default function App() {
               <span className="text-xs font-medium">Week</span>
             </button>
             <button
-              onClick={() => setView('interval')}
+              onClick={() => setView('meals')}
               className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-                view === 'interval' ? 'text-accent-mint' : 'text-gray-400'
+                view === 'meals' ? 'text-accent-mint' : 'text-gray-400'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
+              </svg>
+              <span className="text-xs font-medium">Eten</span>
+            </button>
+            <button
+              onClick={() => setView('schedules')}
+              className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
+                view === 'schedules' ? 'text-accent-mint' : 'text-gray-400'
               }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              <span className="text-xs font-medium">Herhalend</span>
+              <span className="text-xs font-medium">Schema's</span>
             </button>
           </div>
         </div>

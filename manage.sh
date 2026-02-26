@@ -5,7 +5,336 @@ set -euo pipefail
 COMPOSE_FILE=""
 SERVICE="taken"
 
-# Auto-detect compose file
+# ── Terminal setup ──────────────────────────────────────────────────
+init_term() {
+  stty -echo -icanon 2>/dev/null || true
+  printf '\e[?25l'  # hide cursor
+  trap cleanup EXIT INT TERM
+}
+
+cleanup() {
+  printf '\e[?25h'  # show cursor
+  stty sane 2>/dev/null || true
+  printf '\e[0m'
+  clear
+}
+
+# ── ANSI / Drawing ──────────────────────────────────────────────────
+readonly C_RESET='\e[0m'
+readonly C_BOLD='\e[1m'
+readonly C_DIM='\e[2m'
+readonly C_ITALIC='\e[3m'
+readonly C_CYAN='\e[36m'
+readonly C_GREEN='\e[32m'
+readonly C_YELLOW='\e[33m'
+readonly C_RED='\e[31m'
+readonly C_WHITE='\e[97m'
+readonly C_BG_CYAN='\e[46m'
+readonly C_BG_DARK='\e[48;5;236m'
+readonly C_GRAY='\e[90m'
+readonly C_BG_SELECT='\e[48;5;24m'
+readonly C_FG_SELECT='\e[97m'
+
+TERM_COLS=0
+TERM_ROWS=0
+
+get_term_size() {
+  TERM_COLS=$(tput cols 2>/dev/null || echo 80)
+  TERM_ROWS=$(tput lines 2>/dev/null || echo 24)
+}
+
+move_to() { printf '\e[%d;%dH' "$1" "$2"; }
+clear_screen() { printf '\e[2J\e[H'; }
+clear_line() { printf '\e[2K'; }
+
+# Draw a horizontal line
+hr() {
+  local char="${1:-─}"
+  local width="${2:-$TERM_COLS}"
+  local line=""
+  for ((i = 0; i < width; i++)); do line+="$char"; done
+  echo -e "$line"
+}
+
+# Center text in terminal
+center() {
+  local text="$1"
+  # Strip ANSI for length calculation
+  local plain
+  plain=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+  local len=${#plain}
+  local pad=$(( (TERM_COLS - len) / 2 ))
+  ((pad < 0)) && pad=0
+  printf '%*s' "$pad" ''
+  echo -e "$text"
+}
+
+# Draw the header
+draw_header() {
+  get_term_size
+  clear_screen
+
+  echo -e "${C_CYAN}${C_BOLD}"
+  center "┌─────────────────────────────────┐"
+  center "│     Huishouden  ·  Beheer       │"
+  center "└─────────────────────────────────┘"
+  echo -e "${C_RESET}"
+  center "${C_DIM}compose: ${COMPOSE_FILE}${C_RESET}"
+  echo
+}
+
+# Draw a status bar at the bottom
+draw_status_bar() {
+  local text="$1"
+  local plain
+  plain=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+  local len=${#plain}
+  local pad=$((TERM_COLS - len - 2))
+  ((pad < 0)) && pad=0
+  move_to "$TERM_ROWS" 1
+  clear_line
+  echo -ne "${C_BG_DARK}${C_WHITE} ${text}$(printf '%*s' "$pad" '') ${C_RESET}"
+}
+
+# ── Key reading ─────────────────────────────────────────────────────
+# Returns: "up" "down" "enter" "back" "q" or a character
+read_key() {
+  local key
+  IFS= read -rsn1 key
+
+  case "$key" in
+    $'\x1b')
+      local seq
+      IFS= read -rsn1 -t 0.05 seq || true
+      if [[ "$seq" == "[" ]]; then
+        IFS= read -rsn1 -t 0.05 seq || true
+        case "$seq" in
+          A) echo "up"; return ;;
+          B) echo "down"; return ;;
+          C) echo "right"; return ;;
+          D) echo "left"; return ;;
+        esac
+      fi
+      echo "back"
+      return
+      ;;
+    $'\x7f'|$'\x08')  # Backspace / Delete
+      echo "back"
+      return
+      ;;
+    ""|$'\n')
+      echo "enter"
+      return
+      ;;
+    "q"|"Q")
+      echo "q"
+      return
+      ;;
+    *)
+      echo "$key"
+      return
+      ;;
+  esac
+}
+
+# ── Menu widget ─────────────────────────────────────────────────────
+# Interactive menu with arrow key selection
+# Usage: menu_select result_var "Title" "item1" "item2" ...
+# Items can have format "label|description" for two-column display
+# Returns 0 and sets result_var to selected index, or returns 1 on back/quit
+menu_select() {
+  local -n _result=$1
+  shift
+  local title="$1"
+  shift
+  local items=("$@")
+  local count=${#items[@]}
+  local selected=0
+
+  while true; do
+    draw_header
+
+    # Title
+    echo -e "  ${C_BOLD}${C_WHITE}${title}${C_RESET}"
+    echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+    echo
+
+    # Menu items
+    for ((i = 0; i < count; i++)); do
+      local item="${items[$i]}"
+      local label="${item%%|*}"
+      local desc=""
+      [[ "$item" == *"|"* ]] && desc="${item#*|}"
+
+      local menu_w=$((TERM_COLS - 4))
+      ((menu_w < 40)) && menu_w=40
+
+      if ((i == selected)); then
+        local lpad=$((menu_w - ${#label} - 4))
+        ((lpad < 1)) && lpad=1
+        echo -e "  ${C_BG_SELECT}${C_FG_SELECT}${C_BOLD}  ▸ ${label}$(printf '%*s' "$lpad" '')${C_RESET}"
+        if [[ -n "$desc" ]]; then
+          local dpad=$((menu_w - ${#desc} - 4))
+          ((dpad < 1)) && dpad=1
+          echo -e "  ${C_BG_SELECT}${C_FG_SELECT}    ${C_DIM}${desc}$(printf '%*s' "$dpad" '')${C_RESET}"
+        fi
+      else
+        echo -e "    ${C_GRAY}  ${label}${C_RESET}"
+        if [[ -n "$desc" ]]; then
+          echo -e "      ${C_DIM}${desc}${C_RESET}"
+        fi
+      fi
+    done
+
+    draw_status_bar "↑↓ navigeer  ⏎ selecteer  Esc terug  q afsluiten"
+
+    local key
+    key=$(read_key)
+
+    case "$key" in
+      up)
+        ((selected > 0)) && ((selected--)) || true
+        ;;
+      down)
+        ((selected < count - 1)) && ((selected++)) || true
+        ;;
+      enter)
+        _result=$selected
+        return 0
+        ;;
+      back)
+        return 1
+        ;;
+      q)
+        cleanup
+        exit 0
+        ;;
+      # Number shortcuts
+      [0-9])
+        if ((key > 0 && key <= count)); then
+          _result=$((key - 1))
+          return 0
+        fi
+        ;;
+    esac
+  done
+}
+
+# ── Input widgets ───────────────────────────────────────────────────
+
+# Show a pager with output and wait for keypress
+show_output() {
+  local title="$1"
+  local content="$2"
+
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}${title}${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+  echo -e "$content" | sed 's/^/    /'
+  echo
+
+  draw_status_bar "Druk op een toets om terug te gaan"
+
+  read_key > /dev/null
+}
+
+# Read a text input with a prompt (re-enables echo temporarily)
+# Usage: input_text result_var "Label" [hidden]
+input_text() {
+  local -n _input_result=$1
+  local label="$2"
+  local hidden="${3:-}"
+
+  # Show cursor and restore echo for input
+  printf '\e[?25h'
+  stty echo icanon 2>/dev/null || true
+
+  echo -ne "  ${C_BOLD}${label}:${C_RESET} "
+  if [[ "$hidden" == "hidden" ]]; then
+    read -rs _input_result
+    echo
+  else
+    read -r _input_result
+  fi
+
+  # Hide cursor and disable echo again
+  printf '\e[?25l'
+  stty -echo -icanon 2>/dev/null || true
+}
+
+# Confirmation dialog
+# Usage: confirm_action "Question?"
+confirm_action() {
+  local msg="$1"
+
+  printf '\e[?25h'
+  stty echo icanon 2>/dev/null || true
+
+  echo
+  echo -ne "  ${C_YELLOW}${msg}${C_RESET} ${C_DIM}(j/N)${C_RESET} "
+  local answer
+  read -r answer
+
+  printf '\e[?25l'
+  stty -echo -icanon 2>/dev/null || true
+
+  [[ "${answer,,}" == "j" || "${answer,,}" == "y" ]]
+}
+
+# Color picker with arrow keys
+# Usage: color_select result_var
+color_select() {
+  local -n _color_result=$1
+  local colors=("blue" "pink" "green" "purple" "orange" "red" "teal" "yellow")
+  local labels=("Blauw" "Roze" "Groen" "Paars" "Oranje" "Rood" "Teal" "Geel")
+  local color_codes=(
+    '\e[34m█'   # blue
+    '\e[35m█'   # pink
+    '\e[32m█'   # green
+    '\e[35m█'   # purple
+    '\e[33m█'   # orange
+    '\e[31m█'   # red
+    '\e[36m█'   # teal
+    '\e[93m█'   # yellow
+  )
+  local count=${#colors[@]}
+  local selected=0
+
+  while true; do
+    # Render color grid
+    move_to 13 1
+    for ((i = 0; i < count; i++)); do
+      clear_line
+      if ((i == selected)); then
+        local cpad=$((TERM_COLS - ${#labels[$i]} - 12))
+        ((cpad < 1)) && cpad=1
+        echo -e "    ${C_BG_SELECT}${C_FG_SELECT}${C_BOLD} ▸ ${color_codes[$i]}${C_RESET}${C_BG_SELECT}${C_FG_SELECT} ${labels[$i]}$(printf '%*s' "$cpad" '')${C_RESET}"
+      else
+        echo -e "      ${color_codes[$i]}${C_RESET} ${C_GRAY}${labels[$i]}${C_RESET}"
+      fi
+    done
+
+    draw_status_bar "↑↓ navigeer  ⏎ selecteer  Esc terug"
+
+    local key
+    key=$(read_key)
+
+    case "$key" in
+      up)    ((selected > 0)) && ((selected--)) ;;
+      down)  ((selected < count - 1)) && ((selected++)) ;;
+      enter)
+        _color_result="${colors[$selected]}"
+        return 0
+        ;;
+      back)  return 1 ;;
+      q)     cleanup; exit 0 ;;
+    esac
+  done
+}
+
+# ── Docker helpers ──────────────────────────────────────────────────
+
 detect_compose_file() {
   if [[ -n "$COMPOSE_FILE" ]]; then
     return
@@ -26,235 +355,219 @@ dc() {
 }
 
 exec_cli() {
-  dc exec "$SERVICE" node server/cli.js "$@"
-}
-
-# ── Helpers ─────────────────────────────────────────────────────────
-BOLD='\033[1m'
-DIM='\033[2m'
-CYAN='\033[36m'
-GREEN='\033[32m'
-YELLOW='\033[33m'
-RED='\033[31m'
-RESET='\033[0m'
-
-header() {
-  clear
-  echo -e "${CYAN}${BOLD}╔══════════════════════════════════════╗${RESET}"
-  echo -e "${CYAN}${BOLD}║        Taken  ·  Beheer Script       ║${RESET}"
-  echo -e "${CYAN}${BOLD}╚══════════════════════════════════════╝${RESET}"
-  echo -e "${DIM}  compose: ${COMPOSE_FILE}${RESET}"
-  echo
-}
-
-pause() {
-  echo
-  read -rp "Druk op Enter om verder te gaan..."
-}
-
-confirm() {
-  local msg="$1"
-  read -rp "$msg (j/N) " answer
-  [[ "${answer,,}" == "j" || "${answer,,}" == "y" ]]
+  dc exec -T "$SERVICE" node server/cli.js "$@"
 }
 
 check_running() {
   if ! dc ps --status running -q "$SERVICE" &>/dev/null; then
-    echo -e "${RED}Container is niet actief.${RESET}"
-    echo -e "Start met: ${BOLD}docker compose -f $COMPOSE_FILE up -d${RESET}"
-    pause
+    show_output "Fout" "${C_RED}Container is niet actief.${C_RESET}\n\nStart met:\n${C_BOLD}docker compose -f $COMPOSE_FILE up -d${C_RESET}"
     return 1
   fi
 }
 
-# ── User Management ────────────────────────────────────────────────
-list_users() {
-  header
-  echo -e "${BOLD}Gebruikers${RESET}"
-  echo
-  exec_cli list-users
-  pause
+# ── Actions ─────────────────────────────────────────────────────────
+
+action_list_users() {
+  local output
+  output=$(exec_cli list-users 2>&1) || output="${C_RED}Kon gebruikers niet ophalen.${C_RESET}"
+  show_output "Gebruikers" "$output"
 }
 
-add_user() {
-  header
-  echo -e "${BOLD}Gebruiker toevoegen${RESET}"
+action_add_user() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Gebruiker toevoegen${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
   echo
 
-  read -rp "Naam: " name
+  local name pin color
+
+  input_text name "Naam"
   [[ -z "$name" ]] && return
 
-  read -rsp "PIN (4 cijfers): " pin
-  echo
-  [[ -z "$pin" ]] && return
-
-  echo -e "\nKleuren: blue, pink, green, purple, orange, red, teal, yellow"
-  read -rp "Kleur (standaard: blue): " color
-  color="${color:-blue}"
-
-  echo
-  exec_cli add-user "$name" "$pin" "$color"
-  pause
-}
-
-change_pin() {
-  header
-  echo -e "${BOLD}PIN wijzigen${RESET}"
-  echo
-
-  exec_cli list-users
-  echo
-
-  read -rp "Naam: " name
-  [[ -z "$name" ]] && return
-
-  read -rsp "Nieuwe PIN (4 cijfers): " pin
-  echo
+  input_text pin "PIN (4 cijfers)" hidden
   [[ -z "$pin" ]] && return
 
   echo
-  exec_cli change-pin "$name" "$pin"
-  pause
-}
-
-remove_user() {
-  header
-  echo -e "${BOLD}Gebruiker verwijderen${RESET}"
+  echo -e "  ${C_BOLD}Kies een kleur:${C_RESET}"
   echo
 
-  exec_cli list-users
-  echo
-
-  read -rp "Naam: " name
-  [[ -z "$name" ]] && return
-
-  if confirm "Weet je zeker dat je \"$name\" wilt verwijderen?"; then
-    # Pass 'y' to the confirmation prompt inside the container
-    echo "y" | dc exec -T "$SERVICE" node server/cli.js remove-user "$name"
-  else
-    echo "Geannuleerd."
+  if color_select color; then
+    echo
+    local output
+    output=$(exec_cli add-user "$name" "$pin" "$color" 2>&1) || true
+    show_output "Resultaat" "$output"
   fi
-  pause
 }
 
-user_menu() {
-  while true; do
-    header
-    echo -e "${BOLD}Gebruikersbeheer${RESET}"
-    echo
-    echo "  1) Gebruikers tonen"
-    echo "  2) Gebruiker toevoegen"
-    echo "  3) PIN wijzigen"
-    echo "  4) Gebruiker verwijderen"
-    echo
-    echo "  0) Terug"
-    echo
-    read -rp "Keuze: " choice
-
-    check_running || continue
-
-    case "$choice" in
-      1) list_users ;;
-      2) add_user ;;
-      3) change_pin ;;
-      4) remove_user ;;
-      0|"") return ;;
-      *) ;;
-    esac
-  done
-}
-
-# ── Utilities ───────────────────────────────────────────────────────
-show_logs() {
-  header
-  echo -e "${BOLD}Logs${RESET} ${DIM}(Ctrl+C om te stoppen)${RESET}"
-  echo
-  dc logs -f --tail 100 "$SERVICE" || true
-}
-
-backup_db() {
-  header
-  echo -e "${BOLD}Database backup${RESET}"
+action_change_pin() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}PIN wijzigen${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
   echo
 
+  local users_output
+  users_output=$(exec_cli list-users 2>&1) || true
+  echo -e "$users_output" | sed 's/^/    /'
+  echo
+
+  local name pin
+
+  input_text name "Naam"
+  [[ -z "$name" ]] && return
+
+  input_text pin "Nieuwe PIN (4 cijfers)" hidden
+  [[ -z "$pin" ]] && return
+
+  echo
+  local output
+  output=$(exec_cli change-pin "$name" "$pin" 2>&1) || true
+  show_output "Resultaat" "$output"
+}
+
+action_remove_user() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Gebruiker verwijderen${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+
+  local users_output
+  users_output=$(exec_cli list-users 2>&1) || true
+  echo -e "$users_output" | sed 's/^/    /'
+  echo
+
+  local name
+  input_text name "Naam"
+  [[ -z "$name" ]] && return
+
+  if confirm_action "Weet je zeker dat je \"$name\" wilt verwijderen?"; then
+    local output
+    output=$(echo "y" | dc exec -T "$SERVICE" node server/cli.js remove-user "$name" 2>&1) || true
+    show_output "Resultaat" "$output"
+  fi
+}
+
+action_status() {
+  local output
+  output=$(dc ps 2>&1) || output="${C_RED}Kon status niet ophalen.${C_RESET}"
+  show_output "Container status" "$output"
+}
+
+action_logs() {
+  # Logs need full terminal control
+  printf '\e[?25h'
+  stty sane 2>/dev/null || true
+  clear
+
+  echo -e "  ${C_BOLD}Logs${C_RESET} ${C_DIM}(Ctrl+C om te stoppen)${C_RESET}\n"
+  dc logs -f --tail 100 "$SERVICE" 2>&1 || true
+
+  # Restore TUI mode
+  stty -echo -icanon 2>/dev/null || true
+  printf '\e[?25l'
+}
+
+action_backup() {
   local timestamp
   timestamp=$(date +%Y%m%d_%H%M%S)
   local backup_file="backup_${timestamp}.db"
 
-  dc exec "$SERVICE" cp /data/chores.db "/data/${backup_file}"
-  echo -e "${GREEN}Backup aangemaakt: data/${backup_file}${RESET}"
-  pause
+  local output
+  output=$(dc exec -T "$SERVICE" cp /data/chores.db "/data/${backup_file}" 2>&1 && echo -e "${C_GREEN}Backup aangemaakt: data/${backup_file}${C_RESET}") || output="${C_RED}Backup mislukt.${C_RESET}"
+  show_output "Database backup" "$output"
 }
 
-restart_container() {
-  header
-  echo -e "${BOLD}Container herstarten${RESET}"
+action_restart() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Container herstarten${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
   echo
 
-  if confirm "Container herstarten?"; then
-    dc restart "$SERVICE"
-    echo -e "${GREEN}Container herstart.${RESET}"
+  if confirm_action "Container herstarten?"; then
+    local output
+    output=$(dc restart "$SERVICE" 2>&1) || true
+    show_output "Resultaat" "${C_GREEN}Container herstart.${C_RESET}\n\n$output"
   fi
-  pause
 }
 
-show_status() {
-  header
-  echo -e "${BOLD}Container status${RESET}"
-  echo
-  dc ps
-  pause
-}
-
-update_image() {
-  header
-  echo -e "${BOLD}Image bijwerken${RESET}"
-  echo
-
+action_update() {
   if [[ "$COMPOSE_FILE" != "docker-compose.prod.yml" ]]; then
-    echo -e "${YELLOW}Dit is alleen beschikbaar voor productie (docker-compose.prod.yml).${RESET}"
-    pause
+    show_output "Image bijwerken" "${C_YELLOW}Dit is alleen beschikbaar voor productie (docker-compose.prod.yml).${C_RESET}"
     return
   fi
 
-  if confirm "Nieuwste image ophalen en container herstarten?"; then
-    dc pull "$SERVICE"
-    dc up -d "$SERVICE"
-    echo -e "${GREEN}Bijgewerkt naar nieuwste versie.${RESET}"
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Image bijwerken${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+
+  if confirm_action "Nieuwste image ophalen en container herstarten?"; then
+    echo
+    echo -e "    ${C_DIM}Image ophalen...${C_RESET}"
+
+    # Need terminal for docker pull progress
+    printf '\e[?25h'
+    stty sane 2>/dev/null || true
+
+    dc pull "$SERVICE" 2>&1 | sed 's/^/    /'
+    dc up -d "$SERVICE" 2>&1 | sed 's/^/    /'
+
+    stty -echo -icanon 2>/dev/null || true
+    printf '\e[?25l'
+
+    show_output "Resultaat" "${C_GREEN}Bijgewerkt naar nieuwste versie.${C_RESET}"
   fi
-  pause
 }
 
-# ── Main Menu ───────────────────────────────────────────────────────
-main_menu() {
+# ── Menus ───────────────────────────────────────────────────────────
+
+user_menu() {
   while true; do
-    header
-    echo "  1) Gebruikersbeheer"
-    echo "  2) Status"
-    echo "  3) Logs bekijken"
-    echo "  4) Database backup"
-    echo "  5) Container herstarten"
-    echo "  6) Image bijwerken  ${DIM}(prod)${RESET}"
-    echo
-    echo "  0) Afsluiten"
-    echo
-    read -rp "Keuze: " choice
+    local choice
+    if ! menu_select choice "Gebruikersbeheer" \
+      "Gebruikers tonen|Alle geregistreerde gebruikers" \
+      "Gebruiker toevoegen|Naam, PIN en kleur instellen" \
+      "PIN wijzigen|Nieuwe PIN voor bestaande gebruiker" \
+      "Gebruiker verwijderen|Verwijder een gebruiker permanent"; then
+      return
+    fi
+
+    check_running || continue
 
     case "$choice" in
-      1) user_menu ;;
-      2) show_status ;;
-      3) show_logs ;;
-      4) check_running && backup_db ;;
-      5) restart_container ;;
-      6) update_image ;;
-      0|"") echo -e "\n${DIM}Tot ziens!${RESET}"; exit 0 ;;
-      *) ;;
+      0) action_list_users ;;
+      1) action_add_user ;;
+      2) action_change_pin ;;
+      3) action_remove_user ;;
+    esac
+  done
+}
+
+main_menu() {
+  while true; do
+    local choice
+    if ! menu_select choice "Hoofdmenu" \
+      "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
+      "Status|Container status bekijken" \
+      "Logs bekijken|Live logboek volgen" \
+      "Database backup|Maak een kopie van de database" \
+      "Container herstarten|Service opnieuw starten" \
+      "Image bijwerken|Nieuwste versie ophalen (prod)"; then
+      cleanup
+      exit 0
+    fi
+
+    case "$choice" in
+      0) user_menu ;;
+      1) action_status ;;
+      2) action_logs ;;
+      3) check_running && action_backup ;;
+      4) action_restart ;;
+      5) action_update ;;
     esac
   done
 }
 
 # ── Entry Point ─────────────────────────────────────────────────────
-# Accept -f flag for compose file override
 while getopts "f:" opt; do
   case "$opt" in
     f) COMPOSE_FILE="$OPTARG" ;;
@@ -263,4 +576,5 @@ while getopts "f:" opt; do
 done
 
 detect_compose_file
+init_term
 main_menu

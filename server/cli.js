@@ -17,7 +17,7 @@ const command = args[0]
 
 function usage() {
   console.log(`
-Divide/Chores CLI - User Management
+Huishouden CLI - User Management
 
 Usage:
   node server/cli.js <command> [options]
