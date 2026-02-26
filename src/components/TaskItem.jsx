@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { getUserColor, BOTH_COLOR } from '../lib/colors'
 
 export default function TaskItem({ task, isCompleted, onComplete, onUncomplete, onEdit, onDelete, onDeleteAttempt, users, isToday, presentationMode, resetKey }) {
   const assignedUser = users.find(u => u.id === task.assigned_to)
@@ -8,13 +9,11 @@ export default function TaskItem({ task, isCompleted, onComplete, onUncomplete, 
 
   const assigneeAvatar = task.is_both ? null : assignedUser?.avatar_url
 
-  const assigneeConfig = {
-    'Samen': { bg: 'bg-pastel-lavender', border: 'border-pastel-lavenderDark', text: 'text-pastel-lavenderDark', dot: 'bg-pastel-lavenderDark' },
-    'Bijan': { bg: 'bg-brand-bijan/20', border: 'border-brand-bijan', text: 'text-brand-bijan', dot: 'bg-brand-bijan' },
-    'Esther': { bg: 'bg-brand-esther/20', border: 'border-brand-esther', text: 'text-brand-esther', dot: 'bg-brand-esther' },
-  }
-
-  const config = assigneeConfig[assignee] || { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-500', dot: 'bg-gray-400' }
+  const config = task.is_both
+    ? BOTH_COLOR
+    : assignedUser
+      ? getUserColor(assignedUser)
+      : { bg: 'bg-gray-100', bgLight: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-500', dot: 'bg-gray-400' }
 
   const [swipeX, setSwipeX] = useState(0)
   const touchStartX = useRef(null)
@@ -145,7 +144,7 @@ export default function TaskItem({ task, isCompleted, onComplete, onUncomplete, 
                 {task.description}
               </p>
             )}
-            <span className={`inline-flex items-center mt-2 text-xs px-2.5 py-1 rounded-lg font-medium ${config.bg} ${config.text}`}>
+            <span className={`inline-flex items-center mt-2 text-xs px-2.5 py-1 rounded-lg font-medium ${config.bgLight} ${config.text}`}>
               {assigneeAvatar ? (
                 <img src={assigneeAvatar} alt={assignee} className="w-4 h-4 rounded-full object-cover mr-1.5" />
               ) : null}

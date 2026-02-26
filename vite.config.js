@@ -2,8 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-const buildTimestamp = Date.now()
-
 export default defineConfig({
   plugins: [
     react(),
@@ -14,7 +12,7 @@ export default defineConfig({
         name: 'Divide/Chores',
         short_name: 'Divide/Chores',
         description: 'Takenlijst app voor het huishouden',
-        start_url: '/divide-chores/',
+        start_url: '/',
         display: 'standalone',
         background_color: '#FEFDFB',
         theme_color: '#A7F3D0',
@@ -65,8 +63,9 @@ export default defineConfig({
       }
     })
   ],
-  base: '/divide-chores/',
-  define: {
-    'import.meta.env.BUILD_TIMESTAMP': JSON.stringify(buildTimestamp)
+  server: {
+    proxy: {
+      '/api': 'http://localhost:3000'
+    }
   }
 })

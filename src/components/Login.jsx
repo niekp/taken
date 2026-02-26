@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getUserColor } from '../lib/colors'
 
 export default function Login({ onLogin, onSelectUser, users }) {
   const [pin, setPin] = useState('')
@@ -64,18 +65,14 @@ export default function Login({ onLogin, onSelectUser, users }) {
               <button
                 key={user.id}
                 onClick={() => handleSelectUser(user)}
-                className={`w-full p-4 rounded-2xl text-base font-medium transition-all duration-300 active:scale-[0.98] shadow-soft hover:shadow-soft-lg ${
-                  user.name === 'Bijan' 
-                    ? 'bg-brand-bijan text-white hover:bg-brand-bijan/90' 
-                    : 'bg-brand-esther text-white hover:bg-brand-esther/90'
-                }`}
+                className={`w-full p-4 rounded-2xl text-base font-medium transition-all duration-300 active:scale-[0.98] shadow-soft hover:shadow-soft-lg ${getUserColor(user).bg} text-white ${getUserColor(user).bgHover}`}
               >
                 <span className="flex items-center justify-center gap-2">
                   {user.avatar_url ? (
                     <img src={user.avatar_url} alt={user.name} className="w-8 h-8 rounded-full object-cover bg-white/20" />
                   ) : (
-                    <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-base">
-                      {user.name === 'Bijan' ? '👨' : '👩'}
+                    <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-base font-semibold">
+                      {user.name.charAt(0)}
                     </span>
                   )}
                   {user.name}

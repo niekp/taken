@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
+import { getUserColor, BOTH_COLOR } from '../lib/colors'
 
 const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
 export default function WeekView({ currentUser, users, onComplete, presentationMode, onTogglePresentation, onOpenMenu }) {
   const [tasks, setTasks] = useState([])
-  const [completedTasks, setCompletedTasks] = useState(null)  // Start with null, not []
+  const [completedTasks, setCompletedTasks] = useState(null)
   const [meals, setMeals] = useState([])
   const [selectedDay, setSelectedDay] = useState(null)
   const [showModal, setShowModal] = useState(false)
@@ -60,36 +61,33 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     const weekNumber = getWeekNumber(weekDates[0])
     const year = weekDates[0].getFullYear()
     
-    const { data } = await supabase
-      .from('meals')
-      .select('*')
-      .eq('week_number', weekNumber)
-      .eq('year', year)
-      .order('day_of_week')
-    
-    if (data) setMeals(data)
+    try {
+      const data = await api.getMeals(weekNumber, year)
+      setMeals(data)
+    } catch (err) {
+      console.error('Failed to load meals:', err)
+    }
   }
 
   async function loadTasks() {
-    const { data } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (data) setTasks(data)
+    try {
+      const data = await api.getTasks()
+      setTasks(data)
+    } catch (err) {
+      console.error('Failed to load tasks:', err)
+    }
   }
 
   async function loadCompletedTasks() {
     const weekNumber = getWeekNumber(weekDates[0])
     const year = weekDates[0].getFullYear()
     
-    const { data } = await supabase
-      .from('completed_tasks')
-      .select('*')
-      .eq('week_number', weekNumber)
-      .eq('year', year)
-    
-    if (data) setCompletedTasks(data)
+    try {
+      const data = await api.getCompletedTasks(weekNumber, year)
+      setCompletedTasks(data)
+    } catch (err) {
+      console.error('Failed to load completed tasks:', err)
+    }
   }
 
   function getTasksForDay(dayIndex) {
@@ -110,11 +108,9 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         if (createdAt < weekStart || createdAt > weekEnd) return false
       }
       
-      if (filter === 'bijan') {
-        return task.assigned_to === users.find(u => u.name === 'Bijan')?.id || task.is_both
-      }
-      if (filter === 'esther') {
-        return task.assigned_to === users.find(u => u.name === 'Esther')?.id || task.is_both
+      if (filter !== 'all') {
+        // filter is a user ID
+        return task.assigned_to === filter || task.is_both
       }
       return true
     })
@@ -131,18 +127,17 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     const weekNumber = getWeekNumber(weekDates[0])
     const year = weekDates[0].getFullYear()
     
-    const { error } = await supabase
-      .from('completed_tasks')
-      .insert({
+    try {
+      await api.completeTask({
         task_id: task.id,
         user_id: currentUser.id,
         week_number: weekNumber,
-        year: year
+        year: year,
       })
-    
-    if (!error) {
       loadCompletedTasks()
       onComplete()
+    } catch (err) {
+      console.error('Failed to complete task:', err)
     }
   }
 
@@ -150,15 +145,11 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     const weekNumber = getWeekNumber(weekDates[0])
     const year = weekDates[0].getFullYear()
     
-    const { error } = await supabase
-      .from('completed_tasks')
-      .delete()
-      .eq('task_id', task.id)
-      .eq('week_number', weekNumber)
-      .eq('year', year)
-    
-    if (!error) {
+    try {
+      await api.uncompleteTask(task.id, weekNumber, year)
       loadCompletedTasks()
+    } catch (err) {
+      console.error('Failed to uncomplete task:', err)
     }
   }
 
@@ -168,13 +159,11 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
       return
     }
     
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', task.id)
-    
-    if (!error) {
+    try {
+      await api.deleteTask(task.id)
       loadTasks()
+    } catch (err) {
+      console.error('Failed to delete task:', err)
     }
   }
 
@@ -213,29 +202,26 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     const weekNumber = getWeekNumber(weekDates[0])
     const year = weekDates[0].getFullYear()
     
-    const { error } = await supabase
-      .from('meals')
-      .insert({
+    try {
+      await api.createMeal({
         day_of_week: dayIndex,
         meal_name: mealName,
         meal_type: mealType,
         week_number: weekNumber,
-        year: year
+        year: year,
       })
-    
-    if (!error) {
       loadMeals()
+    } catch (err) {
+      console.error('Failed to add meal:', err)
     }
   }
 
   async function deleteMeal(mealId) {
-    const { error } = await supabase
-      .from('meals')
-      .delete()
-      .eq('id', mealId)
-    
-    if (!error) {
+    try {
+      await api.deleteMeal(mealId)
       loadMeals()
+    } catch (err) {
+      console.error('Failed to delete meal:', err)
     }
   }
 
@@ -275,16 +261,17 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           
           <div className="flex items-center gap-2 md:gap-3">
             <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
+              {users.map(u => {
+                const c = getUserColor(u)
+                return (
+                  <div key={u.id} className="flex items-center gap-1">
+                    <div className={`w-3 h-3 rounded-full ${c.dot}`}></div>
+                    <span>{u.name}</span>
+                  </div>
+                )
+              })}
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-brand-bijan"></div>
-                <span>Bijan</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-brand-esther"></div>
-                <span>Esther</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-pastel-lavenderDark"></div>
+                <div className={`w-3 h-3 rounded-full ${BOTH_COLOR.dot}`}></div>
                 <span>Samen</span>
               </div>
             </div>
@@ -469,23 +456,32 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
         <div className="px-4 pb-3">
           <div className="flex gap-1.5 bg-white/60 p-1.5 rounded-2xl">
-            {['all', 'bijan', 'esther'].map(f => {
-              const user = f === 'all' ? null : users.find(u => u.name === f.charAt(0).toUpperCase() + f.slice(1))
-              const avatar = user?.avatar_url
+            <button
+              onClick={() => setFilter('all')}
+              className={`filter-btn flex items-center justify-center gap-1.5 ${
+                filter === 'all' 
+                  ? 'bg-accent-mint text-white shadow-soft' 
+                  : 'text-gray-500 hover:bg-white/50'
+              }`}
+            >
+              Alle
+            </button>
+            {users.map(u => {
+              const avatar = u.avatar_url
               return (
                 <button
-                  key={f}
-                  onClick={() => setFilter(f)}
+                  key={u.id}
+                  onClick={() => setFilter(u.id)}
                   className={`filter-btn flex items-center justify-center gap-1.5 ${
-                    filter === f 
+                    filter === u.id 
                       ? 'bg-accent-mint text-white shadow-soft' 
                       : 'text-gray-500 hover:bg-white/50'
                   }`}
                 >
                   {avatar && (
-                    <img src={avatar} alt={f} className="w-5 h-5 rounded-full object-cover" />
+                    <img src={avatar} alt={u.name} className="w-5 h-5 rounded-full object-cover" />
                   )}
-                  {f === 'all' ? 'Alle' : f === 'bijan' ? 'Bijan' : 'Esther'}
+                  {u.name}
                 </button>
               )
             })}
@@ -524,7 +520,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         </div>
       </div>
 
-      <div className="px-4 pb-24">
+      <div className="px-4 pb-32">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800">
             {DAY_NAMES[activeDay]}
@@ -598,7 +594,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           setSelectedDay(activeDay)
           setShowModal(true)
         }}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white rounded-2xl shadow-soft-lg flex items-center justify-center text-2xl active:scale-95 transition-all hover:shadow-soft-lg"
+        className="fixed bottom-20 right-6 w-14 h-14 bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white rounded-2xl shadow-soft-lg flex items-center justify-center text-2xl active:scale-95 transition-all hover:shadow-soft-lg"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

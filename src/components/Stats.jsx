@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
+import { getUserColor } from '../lib/colors'
 
 const PERIODS = [
   { key: 'week', label: 'Week' },
@@ -19,42 +20,16 @@ export default function Stats({ onClose, users }) {
 
   async function loadStats() {
     setLoading(true)
-    const now = new Date()
-    let query = supabase
-      .from('completed_tasks')
-      .select('*, tasks(title, day_of_week), users(name, avatar_url)')
+    
+    try {
+      const data = await api.getStats(period)
 
-    if (period === 'week') {
-      const weekNum = getWeekNumber(now)
-      const year = now.getFullYear()
-      query = query.eq('week_number', weekNum).eq('year', year)
-    } else if (period === 'month') {
-      const year = now.getFullYear()
-      const month = now.getMonth() + 1
-      const startOfMonth = new Date(year, now.getMonth(), 1)
-      const endOfMonth = new Date(year, now.getMonth() + 1, 0)
-      const startWeek = getWeekNumber(startOfMonth)
-      const endWeek = getWeekNumber(endOfMonth)
-      
-      if (startWeek <= endWeek) {
-        query = query.eq('year', year).gte('week_number', startWeek).lte('week_number', endWeek)
-      } else {
-        query = query.eq('year', year).gte('week_number', startWeek)
-          .or(`week_number.lte.${endWeek},year.lt.${year}`)
-      }
-    } else if (period === 'year') {
-      query = query.eq('year', now.getFullYear())
-    }
-
-    const { data } = await query.order('completed_at', { ascending: false })
-
-    if (data) {
       const totalTasks = data.length
       const tasksByUser = {}
       const taskCounts = {}
 
       users.forEach(u => {
-        tasksByUser[u.id] = { name: u.name, avatar_url: u.avatar_url, count: 0 }
+        tasksByUser[u.id] = { name: u.name, avatar_url: u.avatar_url, color: u.color, count: 0 }
       })
 
       data.forEach(ct => {
@@ -78,7 +53,7 @@ export default function Stats({ onClose, users }) {
         const count = tasksByUser[u.id]?.count || 0
         if (count > maxCount) {
           maxCount = count
-          winner = { ...tasksByUser[u.id], id: u.id }
+          winner = { ...tasksByUser[u.id], id: u.id, color: u.color }
         }
       })
 
@@ -86,6 +61,7 @@ export default function Stats({ onClose, users }) {
         id: u.id,
         name: u.name,
         avatar_url: tasksByUser[u.id]?.avatar_url || u.avatar_url,
+        color: tasksByUser[u.id]?.color || u.color,
         count: tasksByUser[u.id]?.count || 0,
         percentage: totalTasks > 0 ? Math.round((tasksByUser[u.id]?.count || 0) / totalTasks * 100) : 0,
       })).sort((a, b) => b.count - a.count)
@@ -96,17 +72,11 @@ export default function Stats({ onClose, users }) {
         userStats,
         topTasks,
       })
+    } catch (err) {
+      console.error('Failed to load stats:', err)
     }
 
     setLoading(false)
-  }
-
-  function getWeekNumber(date) {
-    const d = new Date(date)
-    d.setHours(0, 0, 0, 0)
-    d.setDate(d.getDate() + 4 - (d.getDay() || 7))
-    const yearStart = new Date(d.getFullYear(), 0, 1)
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
   }
 
   return (
@@ -175,9 +145,7 @@ export default function Stats({ onClose, users }) {
                         {user.avatar_url ? (
                           <img src={user.avatar_url} alt={user.name} className="w-6 h-6 rounded-full object-cover" />
                         ) : (
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                            user.name === 'Bijan' ? 'bg-brand-bijan text-white' : 'bg-brand-esther text-white'
-                          }`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${getUserColor(user).bg} text-white`}>
                             {user.name.charAt(0)}
                           </div>
                         )}
@@ -196,9 +164,7 @@ export default function Stats({ onClose, users }) {
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
-                        className={`h-full rounded-full transition-all ${
-                          user.name === 'Bijan' ? 'bg-brand-bijan' : 'bg-brand-esther'
-                        }`}
+                        className={`h-full rounded-full transition-all ${getUserColor(user).bg}`}
                         style={{ width: `${user.percentage}%` }}
                       />
                     </div>

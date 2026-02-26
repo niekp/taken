@@ -24,10 +24,6 @@ export default {
           lilac: '#D4C8E8',
           lilacDark: '#B5A2CC',
         },
-        brand: {
-          bijan: '#8BB8E8',
-          esther: '#F5A8C0',
-        },
         accent: {
           mint: '#7BC4A8',
           lavender: '#B89DD4',

@@ -1,0 +1,18 @@
+# Dependencies
+node_modules
+
+# Build output (built inside Docker)
+dist
+
+# Git
+.git
+.gitignore
+
+# Development files
+*.md
+.DS_Store
+*.local
+.env
+
+# Data
+data

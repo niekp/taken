@@ -1,0 +1,14 @@
+services:
+  taken:
+    image: ghcr.io/niekp/taken:latest
+    container_name: taken
+    ports:
+      - "3000:3000"
+    volumes:
+      - taken-data:/data
+    environment:
+      - DB_PATH=/data/chores.db
+    restart: unless-stopped
+
+volumes:
+  taken-data:

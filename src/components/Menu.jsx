@@ -1,21 +1,28 @@
 import { useState, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
+import { getUserColor } from '../lib/colors'
 
 export default function Menu({ onClose, onLogout, currentUser, presentationMode, onTogglePresentation, onUpdateUser, onOpenStats }) {
   const [showHistory, setShowHistory] = useState(false)
   const [completedTasks, setCompletedTasks] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [showChangePin, setShowChangePin] = useState(false)
+  const [currentPin, setCurrentPin] = useState('')
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinError, setPinError] = useState('')
+  const [pinSuccess, setPinSuccess] = useState(false)
+  const [changingPin, setChangingPin] = useState(false)
   const fileInputRef = useRef(null)
 
   async function loadHistory() {
     setLoadingHistory(true)
-    const { data } = await supabase
-      .from('completed_tasks')
-      .select('*, tasks(title, day_of_week), users(name)')
-      .order('completed_at', { ascending: false })
-      .limit(50)
-    
-    if (data) setCompletedTasks(data)
+    try {
+      const data = await api.getHistory(50)
+      setCompletedTasks(data)
+    } catch (err) {
+      console.error('Failed to load history:', err)
+    }
     setLoadingHistory(false)
   }
 
@@ -42,6 +49,37 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
     if (onUpdateUser) {
       await onUpdateUser({ avatar_url: null })
     }
+  }
+
+  async function handleChangePin(e) {
+    e.preventDefault()
+    setPinError('')
+    setPinSuccess(false)
+
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinError('PIN moet precies 4 cijfers zijn')
+      return
+    }
+    if (newPin !== confirmPin) {
+      setPinError('Nieuwe PINs komen niet overeen')
+      return
+    }
+
+    setChangingPin(true)
+    try {
+      await api.changePin(currentUser.id, currentPin, newPin)
+      setPinSuccess(true)
+      setCurrentPin('')
+      setNewPin('')
+      setConfirmPin('')
+      setTimeout(() => {
+        setShowChangePin(false)
+        setPinSuccess(false)
+      }, 1500)
+    } catch (err) {
+      setPinError(err.message === 'Current PIN is incorrect' ? 'Huidige PIN is onjuist' : 'Er is iets misgegaan')
+    }
+    setChangingPin(false)
   }
 
   const menuItems = [
@@ -82,6 +120,17 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
       onClick: onOpenStats,
       bg: 'bg-pastel-peach/30',
       iconBg: 'bg-pastel-peach',
+    },
+    {
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+        </svg>
+      ),
+      label: 'PIN wijzigen',
+      onClick: () => setShowChangePin(true),
+      bg: 'bg-pastel-sky/30',
+      iconBg: 'bg-pastel-sky',
     },
     ...(currentUser?.avatar_url ? [{
       icon: (
@@ -125,8 +174,8 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
                   {currentUser?.avatar_url ? (
                     <img src={currentUser.avatar_url} alt={currentUser.name} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-2xl">
-                      {currentUser?.name === 'Bijan' ? '👨' : '👩'}
+                    <span className={`w-full h-full flex items-center justify-center text-lg font-semibold text-white ${getUserColor(currentUser).bg}`}>
+                      {currentUser?.name?.charAt(0) || '?'}
                     </span>
                   )}
                 </div>
@@ -237,6 +286,98 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {showChangePin && (
+        <div className="fixed inset-0 bg-gray-900/30 backdrop-blur-sm z-[60]" onClick={() => setShowChangePin(false)}>
+          <div 
+            className="bg-white rounded-t-3xl w-full max-h-[80vh] overflow-y-auto absolute bottom-0 shadow-soft-lg"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-800">PIN wijzigen</h2>
+              <button onClick={() => setShowChangePin(false)} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePin} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Huidige PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={currentPin}
+                  onChange={e => setCurrentPin(e.target.value.replace(/\D/g, ''))}
+                  placeholder="****"
+                  className="input-field text-center text-2xl tracking-[0.5em]"
+                  autoFocus
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Nieuwe PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={newPin}
+                  onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))}
+                  placeholder="****"
+                  className="input-field text-center text-2xl tracking-[0.5em]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Bevestig nieuwe PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={confirmPin}
+                  onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                  placeholder="****"
+                  className="input-field text-center text-2xl tracking-[0.5em]"
+                  required
+                />
+              </div>
+
+              {pinError && (
+                <div className="flex items-center gap-2 text-red-500 text-sm bg-red-50 py-2 px-4 rounded-xl">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {pinError}
+                </div>
+              )}
+
+              {pinSuccess && (
+                <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 py-2 px-4 rounded-xl">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  PIN is gewijzigd!
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={changingPin || currentPin.length !== 4 || newPin.length !== 4 || confirmPin.length !== 4}
+                className="btn-primary w-full py-4 text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {changingPin ? (
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : 'PIN wijzigen'}
+              </button>
+            </form>
           </div>
         </div>
       )}

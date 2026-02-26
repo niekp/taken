@@ -5,7 +5,7 @@ import './index.css'
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/divide-chores/sw.js').then(registration => {
+    navigator.serviceWorker.register('/sw.js').then(registration => {
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing
         newWorker.addEventListener('statechange', () => {

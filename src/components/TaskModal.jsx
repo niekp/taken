@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
+import { getUserColor, BOTH_COLOR } from '../lib/colors'
 
 const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -12,10 +13,7 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
   const [dayOfWeek, setDayOfWeek] = useState(editTask?.day_of_week ?? dayIndex)
   const [assignedTo, setAssignedTo] = useState(() => {
     if (editTask?.is_both) return 'both'
-    if (editTask?.assigned_to) {
-      const assignedUser = users.find(u => u.id === editTask.assigned_to)
-      return assignedUser?.name?.toLowerCase() || 'both'
-    }
+    if (editTask?.assigned_to) return editTask.assigned_to
     return 'both'
   })
   const [isRecurring, setIsRecurring] = useState(editTask?.is_recurring ?? false)
@@ -34,59 +32,44 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
       
       setLoading(true)
   
-      const bijan = users.find(u => u.name === 'Bijan')
-      const esther = users.find(u => u.name === 'Esther')
-  
       let taskAssignedTo = null
       let taskIsBoth = false
   
       if (assignedTo === 'both') {
         taskIsBoth = true
-      } else if (assignedTo === 'bijan' && bijan) {
-        taskAssignedTo = bijan.id
-      } else if (assignedTo === 'esther' && esther) {
-        taskAssignedTo = esther.id
+      } else {
+        // assignedTo is a user ID
+        taskAssignedTo = assignedTo
       }
   
-      if (isEditing) {
-        const { error } = await supabase
-          .from('tasks')
-          .update({
-            title: title.trim(),
-            description: description.trim() || null,
-            day_of_week: dayOfWeek,
-            assigned_to: taskAssignedTo,
-            is_both: taskIsBoth,
-            is_recurring: isRecurring
-          })
-          .eq('id', editTask.id)
-  
-        setLoading(false)
-  
-        if (!error) {
-          onTaskCreated()
-          onClose()
-        }
-      } else {
-        const { error } = await supabase
-          .from('tasks')
-          .insert({
+      try {
+        if (isEditing) {
+          await api.updateTask(editTask.id, {
             title: title.trim(),
             description: description.trim() || null,
             day_of_week: dayOfWeek,
             assigned_to: taskAssignedTo,
             is_both: taskIsBoth,
             is_recurring: isRecurring,
-            created_by: currentUser.id
           })
-  
-        setLoading(false)
-  
-        if (!error) {
-          onTaskCreated()
-          onClose()
+        } else {
+          await api.createTask({
+            title: title.trim(),
+            description: description.trim() || null,
+            day_of_week: dayOfWeek,
+            assigned_to: taskAssignedTo,
+            is_both: taskIsBoth,
+            is_recurring: isRecurring,
+            created_by: currentUser.id,
+          })
         }
+        onTaskCreated()
+        onClose()
+      } catch (err) {
+        console.error('Failed to save task:', err)
       }
+      
+      setLoading(false)
     } else {
       if (!mealName.trim()) return
       
@@ -107,23 +90,24 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
 
     setLoading(true)
 
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', editTask.id)
-
-    setLoading(false)
-
-    if (!error) {
+    try {
+      await api.deleteTask(editTask.id)
       onTaskCreated()
       onClose()
+    } catch (err) {
+      console.error('Failed to delete task:', err)
     }
+
+    setLoading(false)
   }
 
+  const bothColor = BOTH_COLOR
   const assigneeOptions = [
-    { value: 'both', label: 'Samen', bg: 'bg-pastel-lavender', activeBg: 'bg-pastel-lavenderDark' },
-    { value: 'bijan', label: 'Bijan', bg: 'bg-brand-bijan/20', activeBg: 'bg-brand-bijan' },
-    { value: 'esther', label: 'Esther', bg: 'bg-brand-esther/20', activeBg: 'bg-brand-esther' },
+    { value: 'both', label: 'Samen', bg: bothColor.bgLight, activeBg: bothColor.bg },
+    ...users.map(u => {
+      const c = getUserColor(u)
+      return { value: u.id, label: u.name, bg: c.bgLight, activeBg: c.bg }
+    }),
   ]
 
   return (
@@ -270,7 +254,7 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     }`}
                   >
-                    🍞 Lunch
+                    Lunch
                   </button>
                   <button
                     type="button"
@@ -281,7 +265,7 @@ export default function TaskModal({ dayIndex, dayName, onClose, users, currentUs
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     }`}
                   >
-                    🍝 Diner
+                    Diner
                   </button>
                 </div>
               </div>
