@@ -4,6 +4,8 @@ set -euo pipefail
 # ── Config ──────────────────────────────────────────────────────────
 COMPOSE_FILE=""
 SERVICE="taken"
+MANAGE_URL="https://raw.githubusercontent.com/niekp/taken/main/manage.sh"
+SELF="$(realpath "$0")"
 
 # ── Terminal setup ──────────────────────────────────────────────────
 init_term() {
@@ -490,32 +492,67 @@ action_restart() {
 }
 
 action_update() {
-  if [[ "$COMPOSE_FILE" != "docker-compose.prod.yml" ]]; then
-    show_output "Image bijwerken" "${C_YELLOW}Dit is alleen beschikbaar voor productie (docker-compose.prod.yml).${C_RESET}"
-    return
-  fi
-
   draw_header
-  echo -e "  ${C_BOLD}${C_WHITE}Image bijwerken${C_RESET}"
+  echo -e "  ${C_BOLD}${C_WHITE}Bijwerken${C_RESET}"
   echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
   echo
 
-  if confirm_action "Nieuwste image ophalen en container herstarten?"; then
-    echo
-    echo -e "    ${C_DIM}Image ophalen...${C_RESET}"
-
-    # Need terminal for docker pull progress
-    printf '\e[?25h'
-    stty sane 2>/dev/null || true
-
-    dc pull "$SERVICE" 2>&1 | sed 's/^/    /'
-    dc up -d "$SERVICE" 2>&1 | sed 's/^/    /'
-
-    stty -echo -icanon 2>/dev/null || true
-    printf '\e[?25l'
-
-    show_output "Resultaat" "${C_GREEN}Bijgewerkt naar nieuwste versie.${C_RESET}"
+  if ! confirm_action "Controleren op updates en bijwerken?"; then
+    return
   fi
+
+  echo
+  echo -e "    ${C_DIM}Beheerscript controleren...${C_RESET}"
+
+  # Step 1: Check if manage.sh itself needs updating
+  local tmp_manage
+  tmp_manage=$(mktemp)
+  local script_updated=false
+
+  if curl -fsSL "$MANAGE_URL" -o "$tmp_manage" 2>/dev/null; then
+    if ! diff -q "$SELF" "$tmp_manage" &>/dev/null; then
+      cp "$tmp_manage" "$SELF"
+      chmod +x "$SELF"
+      rm -f "$tmp_manage"
+
+      script_updated=true
+
+      # Restore terminal before message
+      printf '\e[?25h'
+      stty sane 2>/dev/null || true
+      clear
+
+      echo
+      echo -e "  ${C_GREEN}${C_BOLD}Beheerscript is bijgewerkt.${C_RESET}"
+      echo
+      echo -e "  Start het script opnieuw om verder te gaan met de update:"
+      echo -e "  ${C_BOLD}./manage.sh${C_RESET}"
+      echo
+      exit 0
+    fi
+  else
+    echo -e "    ${C_YELLOW}Kon beheerscript niet ophalen, ga verder met image update...${C_RESET}"
+  fi
+  rm -f "$tmp_manage"
+
+  if ! $script_updated; then
+    echo -e "    ${C_DIM}Beheerscript is actueel.${C_RESET}"
+  fi
+
+  # Step 2: Pull latest image and restart
+  echo
+  echo -e "    ${C_DIM}Image ophalen...${C_RESET}"
+
+  printf '\e[?25h'
+  stty sane 2>/dev/null || true
+
+  dc pull "$SERVICE" 2>&1 | sed 's/^/    /'
+  dc up -d "$SERVICE" 2>&1 | sed 's/^/    /'
+
+  stty -echo -icanon 2>/dev/null || true
+  printf '\e[?25l'
+
+  show_output "Resultaat" "${C_GREEN}Bijgewerkt naar nieuwste versie.${C_RESET}"
 }
 
 # ── Menus ───────────────────────────────────────────────────────────
@@ -688,7 +725,7 @@ main_menu() {
       "Logs bekijken|Live logboek volgen" \
       "Database backup|Maak een kopie van de database" \
       "Container herstarten|Service opnieuw starten" \
-      "Image bijwerken|Nieuwste versie ophalen (prod)"; then
+      "Bijwerken|Script en image bijwerken (prod)"; then
       cleanup
       exit 0
     fi
