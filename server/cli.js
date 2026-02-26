@@ -2,6 +2,8 @@
 
 import { initDb } from './db.js'
 import * as userRepo from './repositories/userRepository.js'
+import * as bringRepo from './repositories/bringRepository.js'
+import { BringClient } from './lib/bring.js'
 import fs from 'fs'
 import path from 'path'
 import readline from 'readline'
@@ -17,16 +19,24 @@ const command = args[0]
 
 function usage() {
   console.log(`
-Huishouden CLI - User Management
+Huishouden CLI - User & Bring! Management
 
 Usage:
   node server/cli.js <command> [options]
 
-Commands:
+User Commands:
   list-users                          List all users
-  add-user <name> <pin> [color]        Add a new user (PIN must be 4 digits)
+  add-user <name> <pin> [color]       Add a new user (PIN must be 4 digits)
   change-pin <name> <new-pin>         Change a user's PIN
   remove-user <name>                  Remove a user (with confirmation)
+
+Bring! Commands:
+  bring-login <email> <password>      Login to Bring! and store credentials
+  bring-lists                         Show available Bring! lists
+  bring-set-list <list-uuid> <name>   Select which Bring! list to use
+  bring-status                        Show current Bring! configuration
+  bring-remove                        Remove Bring! configuration
+
   help                                Show this help message
 
 Colors: blue, pink, green, purple, orange, red, teal, yellow (default: blue)
@@ -36,6 +46,9 @@ Examples:
   node server/cli.js add-user "Alice" 1234 blue
   node server/cli.js change-pin "Alice" 5678
   node server/cli.js remove-user "Alice"
+  node server/cli.js bring-login "user@example.com" "password123"
+  node server/cli.js bring-lists
+  node server/cli.js bring-set-list "abc-123" "Boodschappen"
 `)
 }
 
@@ -150,6 +163,143 @@ async function main() {
 
       userRepo.remove(user.id)
       console.log(`User "${name}" removed successfully`)
+      break
+    }
+
+    case 'bring-login': {
+      const email = args[1]
+      const password = args[2]
+      if (!email || !password) {
+        console.error('Usage: bring-login <email> <password>')
+        process.exit(1)
+      }
+
+      // Save credentials
+      bringRepo.saveConfig({ email, password, list_uuid: null, list_name: null })
+
+      // Login to Bring! API
+      const client = new BringClient({ email, password })
+      try {
+        await client.login()
+        // Store tokens
+        bringRepo.updateTokens(client.getTokenData())
+        console.log(`Bring! login successful (user: ${email})`)
+        console.log(`UUID: ${client.uuid}`)
+        console.log(`Country: ${client.country}`)
+
+        // Show available lists
+        const lists = await client.getLists()
+        if (lists.length > 0) {
+          console.log(`\nBeschikbare lijsten:`)
+          for (const list of lists) {
+            console.log(`  ${list.listUuid}  ${list.name}`)
+          }
+          console.log(`\nGebruik 'bring-set-list <uuid> <naam>' om een lijst te selecteren.`)
+        }
+      } catch (err) {
+        console.error(`Bring! login failed: ${err.message}`)
+        // Clean up the saved config since login failed
+        bringRepo.removeConfig()
+        process.exit(1)
+      }
+      break
+    }
+
+    case 'bring-lists': {
+      const config = bringRepo.getConfig()
+      if (!config) {
+        console.error('Bring! is not configured. Use bring-login first.')
+        process.exit(1)
+      }
+
+      const client = new BringClient({
+        email: config.email,
+        password: config.password,
+        uuid: config.uuid,
+        publicUuid: config.public_uuid,
+        accessToken: config.access_token,
+        refreshToken: config.refresh_token,
+        expiresAt: config.expires_at,
+        country: config.country,
+      })
+      client.onTokenUpdate = (tokens) => bringRepo.updateTokens(tokens)
+
+      try {
+        const lists = await client.getLists()
+        if (lists.length === 0) {
+          console.log('No lists found.')
+        } else {
+          console.log('\nBeschikbare lijsten:')
+          console.log('-'.repeat(60))
+          for (const list of lists) {
+            const marker = config.list_uuid === list.listUuid ? ' ← actief' : ''
+            console.log(`  ${list.listUuid}  ${list.name}${marker}`)
+          }
+          console.log('-'.repeat(60))
+        }
+      } catch (err) {
+        console.error(`Failed to fetch lists: ${err.message}`)
+        process.exit(1)
+      }
+      break
+    }
+
+    case 'bring-set-list': {
+      const listUuid = args[1]
+      const listName = args[2]
+      if (!listUuid || !listName) {
+        console.error('Usage: bring-set-list <list-uuid> <list-name>')
+        process.exit(1)
+      }
+
+      const config = bringRepo.getConfig()
+      if (!config) {
+        console.error('Bring! is not configured. Use bring-login first.')
+        process.exit(1)
+      }
+
+      bringRepo.setList(listUuid, listName)
+      console.log(`Bring! list set to "${listName}" (${listUuid})`)
+      break
+    }
+
+    case 'bring-status': {
+      const config = bringRepo.getConfig()
+      if (!config) {
+        console.log('Bring! is not configured.')
+      } else {
+        console.log('\nBring! configuratie:')
+        console.log('-'.repeat(40))
+        console.log(`  Email:    ${config.email}`)
+        console.log(`  Lijst:    ${config.list_name || '(niet geselecteerd)'}`)
+        console.log(`  List ID:  ${config.list_uuid || '-'}`)
+        console.log(`  Country:  ${config.country || '-'}`)
+        console.log(`  Ingelogd: ${config.access_token ? 'Ja' : 'Nee'}`)
+        if (config.expires_at) {
+          const expiresDate = new Date(config.expires_at)
+          const isExpired = Date.now() >= config.expires_at
+          console.log(`  Token:    ${isExpired ? 'Verlopen' : `Geldig tot ${expiresDate.toLocaleString('nl-NL')}`}`)
+        }
+        console.log('-'.repeat(40))
+      }
+      break
+    }
+
+    case 'bring-remove': {
+      const config = bringRepo.getConfig()
+      if (!config) {
+        console.log('Bring! is not configured.')
+        break
+      }
+
+      const answer = await prompt('Are you sure you want to remove Bring! configuration? (y/N) ')
+      if (answer.toLowerCase() !== 'y') {
+        console.log('Cancelled')
+        break
+      }
+
+      bringRepo.removeConfig()
+      console.log('Bring! configuration removed.')
       break
     }
 

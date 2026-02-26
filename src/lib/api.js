@@ -105,4 +105,24 @@ export const api = {
   deleteMeal: (id) => request(`/meals/${id}`, {
     method: 'DELETE',
   }),
+
+  // Bring! shopping list
+  getBringStatus: () => request('/bring/status'),
+
+  getBringItems: () => request('/bring/items'),
+
+  addBringItem: (name, specification) => request('/bring/items', {
+    method: 'POST',
+    body: JSON.stringify({ name, specification }),
+  }),
+
+  completeBringItem: (name, uuid) => request('/bring/items/complete', {
+    method: 'POST',
+    body: JSON.stringify({ name, uuid }),
+  }),
+
+  removeBringItem: (name, uuid) => request('/bring/items/remove', {
+    method: 'POST',
+    body: JSON.stringify({ name, uuid }),
+  }),
 }

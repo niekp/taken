@@ -542,11 +542,148 @@ user_menu() {
   done
 }
 
+# ── Bring! Actions ──────────────────────────────────────────────────
+
+action_bring_status() {
+  local output
+  output=$(exec_cli bring-status 2>&1) || output="${C_RED}Kon Bring! status niet ophalen.${C_RESET}"
+  show_output "Bring! Status" "$output"
+}
+
+action_bring_login() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Bring! Inloggen${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+
+  local email password
+
+  input_text email "E-mailadres"
+  [[ -z "$email" ]] && return
+
+  input_text password "Wachtwoord" hidden
+  [[ -z "$password" ]] && return
+
+  echo
+  echo -e "    ${C_DIM}Inloggen bij Bring!...${C_RESET}"
+
+  # Need terminal for potential long output
+  printf '\e[?25h'
+  stty sane 2>/dev/null || true
+
+  local output
+  output=$(exec_cli bring-login "$email" "$password" 2>&1) || true
+
+  stty -echo -icanon 2>/dev/null || true
+  printf '\e[?25l'
+
+  show_output "Resultaat" "$output"
+}
+
+action_bring_select_list() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Bring! Lijst selecteren${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+  echo -e "    ${C_DIM}Lijsten ophalen...${C_RESET}"
+
+  # Fetch lists from CLI
+  local lists_output
+  lists_output=$(exec_cli bring-lists 2>&1) || true
+
+  # Parse list UUIDs and names from the output
+  # Expected format: "  <uuid>  <name>"
+  local -a list_uuids=()
+  local -a list_names=()
+
+  while IFS= read -r line; do
+    # Strip leading/trailing whitespace and ANSI codes
+    local clean
+    clean=$(echo "$line" | sed 's/\x1b\[[0-9;]*m//g' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+
+    # Skip empty lines, headers, and separators
+    [[ -z "$clean" ]] && continue
+    [[ "$clean" == -* ]] && continue
+    [[ "$clean" == Beschikbare* ]] && continue
+    [[ "$clean" == No* ]] && continue
+
+    # Parse UUID and name (UUID is first token, rest is name)
+    local uuid name
+    uuid=$(echo "$clean" | awk '{print $1}')
+    # Name is everything after UUID, strip "← actief" marker
+    name=$(echo "$clean" | sed "s/^${uuid}[[:space:]]*//" | sed 's/ ← actief$//')
+
+    if [[ -n "$uuid" && -n "$name" ]]; then
+      list_uuids+=("$uuid")
+      list_names+=("$name")
+    fi
+  done <<< "$lists_output"
+
+  if [[ ${#list_uuids[@]} -eq 0 ]]; then
+    show_output "Bring! Lijsten" "${C_YELLOW}Geen lijsten gevonden. Log eerst in met Bring!.${C_RESET}\n\n$lists_output"
+    return
+  fi
+
+  # Build menu items from lists
+  local -a menu_items=()
+  for ((i = 0; i < ${#list_names[@]}; i++)); do
+    menu_items+=("${list_names[$i]}|${list_uuids[$i]}")
+  done
+
+  local choice
+  if ! menu_select choice "Selecteer een lijst" "${menu_items[@]}"; then
+    return
+  fi
+
+  local selected_uuid="${list_uuids[$choice]}"
+  local selected_name="${list_names[$choice]}"
+
+  local output
+  output=$(exec_cli bring-set-list "$selected_uuid" "$selected_name" 2>&1) || true
+  show_output "Resultaat" "$output"
+}
+
+action_bring_remove() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Bring! Configuratie verwijderen${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+
+  if confirm_action "Weet je zeker dat je de Bring! configuratie wilt verwijderen?"; then
+    local output
+    output=$(echo "y" | dc exec -T "$SERVICE" node server/cli.js bring-remove 2>&1) || true
+    show_output "Resultaat" "$output"
+  fi
+}
+
+bring_menu() {
+  while true; do
+    local choice
+    if ! menu_select choice "Bring! Instellingen" \
+      "Status bekijken|Huidige Bring! configuratie" \
+      "Inloggen|E-mail en wachtwoord instellen" \
+      "Lijst selecteren|Kies een boodschappenlijst" \
+      "Configuratie verwijderen|Bring! koppeling verwijderen"; then
+      return
+    fi
+
+    check_running || continue
+
+    case "$choice" in
+      0) action_bring_status ;;
+      1) action_bring_login ;;
+      2) action_bring_select_list ;;
+      3) action_bring_remove ;;
+    esac
+  done
+}
+
 main_menu() {
   while true; do
     local choice
     if ! menu_select choice "Hoofdmenu" \
       "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
+      "Bring! Instellingen|Boodschappenlijst koppelen" \
       "Status|Container status bekijken" \
       "Logs bekijken|Live logboek volgen" \
       "Database backup|Maak een kopie van de database" \
@@ -558,11 +695,12 @@ main_menu() {
 
     case "$choice" in
       0) user_menu ;;
-      1) action_status ;;
-      2) action_logs ;;
-      3) check_running && action_backup ;;
-      4) action_restart ;;
-      5) action_update ;;
+      1) bring_menu ;;
+      2) action_status ;;
+      3) action_logs ;;
+      4) check_running && action_backup ;;
+      5) action_restart ;;
+      6) action_update ;;
     esac
   done
 }

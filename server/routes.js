@@ -3,6 +3,7 @@ import * as userController from './controllers/userController.js'
 import * as scheduleController from './controllers/scheduleController.js'
 import * as taskController from './controllers/taskController.js'
 import * as mealController from './controllers/mealController.js'
+import * as bringController from './controllers/bringController.js'
 
 const router = Router()
 
@@ -37,5 +38,13 @@ router.get('/meals', mealController.list)
 router.post('/meals', mealController.create)
 router.put('/meals/:id', mealController.update)
 router.delete('/meals/:id', mealController.remove)
+
+// Bring! shopping list
+router.get('/bring/status', bringController.status)
+router.get('/bring/lists', bringController.getLists)
+router.get('/bring/items', bringController.getItems)
+router.post('/bring/items', bringController.addItem)
+router.post('/bring/items/complete', bringController.completeItem)
+router.post('/bring/items/remove', bringController.removeItem)
 
 export default router

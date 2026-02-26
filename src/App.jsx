@@ -4,6 +4,7 @@ import Login from './components/Login'
 import WeekView from './components/WeekView'
 import SchedulesView from './components/SchedulesView'
 import MealsView from './components/MealsView'
+import BoodschappenView from './components/BoodschappenView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
 import Confetti from './components/Confetti'
@@ -11,10 +12,11 @@ import Confetti from './components/Confetti'
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
-  const [view, setView] = useState('weekly') // 'weekly' | 'schedules' | 'meals'
+  const [view, setView] = useState('weekly') // 'weekly' | 'meals' | 'schedules' | 'boodschappen'
   const [showMenu, setShowMenu] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
+  const [bringEnabled, setBringEnabled] = useState(false)
   const [presentationMode, setPresentationMode] = useState(() => {
     const params = new URLSearchParams(window.location.search)
     return params.get('mode') === 'presentation'
@@ -24,6 +26,7 @@ export default function App() {
 
   useEffect(() => {
     loadUsers()
+    checkBringStatus()
   }, [])
 
   // Restore session from localStorage once users are loaded
@@ -65,6 +68,15 @@ export default function App() {
       setUsers(data)
     } catch (err) {
       console.error('Failed to load users:', err)
+    }
+  }
+
+  async function checkBringStatus() {
+    try {
+      const data = await api.getBringStatus()
+      setBringEnabled(data.configured && !!data.list_uuid)
+    } catch (err) {
+      // Bring not available
     }
   }
 
@@ -139,6 +151,10 @@ export default function App() {
           presentationMode={presentationMode}
           onTogglePresentation={() => setPresentationMode(!presentationMode)}
         />
+      ) : view === 'boodschappen' ? (
+        <BoodschappenView
+          onOpenMenu={() => setShowMenu(true)}
+        />
       ) : (
         <SchedulesView
           currentUser={currentUser}
@@ -174,6 +190,19 @@ export default function App() {
               </svg>
               <span className="text-xs font-medium">Eten</span>
             </button>
+            {bringEnabled && (
+              <button
+                onClick={() => setView('boodschappen')}
+                className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
+                  view === 'boodschappen' ? 'text-accent-mint' : 'text-gray-400'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                </svg>
+                <span className="text-xs font-medium">Boodschappen</span>
+              </button>
+            )}
             <button
               onClick={() => setView('schedules')}
               className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
