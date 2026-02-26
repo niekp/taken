@@ -85,6 +85,19 @@ export function update(id, { title, date, assigned_to, is_both }) {
 }
 
 /**
+ * Reassign a single task instance (works for both scheduled and one-off tasks).
+ * Only updates assigned_to and is_both — does NOT change title or date.
+ */
+export function reassign(id, { assigned_to, is_both }) {
+  const db = getDb()
+  db.prepare(`
+    UPDATE tasks SET assigned_to = ?, is_both = ?
+    WHERE id = ? AND completed_at IS NULL
+  `).run(assigned_to || null, is_both ? 1 : 0, id)
+  return findById(id)
+}
+
+/**
  * Complete a task. If it belongs to a schedule, generate the next occurrence.
  * @returns {{ task: object, nextTask: object|null }}
  */

@@ -476,7 +476,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                     task={task}
                     onComplete={() => handleCompleteTask(task)}
                     onUncomplete={() => handleUncompleteTask(task)}
-                    onEdit={!task.schedule_id ? (t) => { setEditTask(t); setShowModal(true) } : undefined}
+                    onEdit={(t) => { setEditTask(t); setShowModal(true) }}
                     onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
                     onDeleteAttempt={() => setResetKey(k => k + 1)}
                     users={users}

@@ -123,7 +123,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
 
   return (
     <div
-      onClick={() => !isCompleted && !task.schedule_id && onEdit && onEdit(task)}
+      onClick={() => !isCompleted && onEdit && onEdit(task)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}

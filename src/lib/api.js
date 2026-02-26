@@ -65,6 +65,11 @@ export const api = {
     body: JSON.stringify(updates),
   }),
 
+  reassignTask: (id, { assigned_to, is_both }) => request(`/tasks/${id}/reassign`, {
+    method: 'POST',
+    body: JSON.stringify({ assigned_to, is_both }),
+  }),
+
   deleteTask: (id) => request(`/tasks/${id}`, {
     method: 'DELETE',
   }),

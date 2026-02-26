@@ -25,6 +25,15 @@ export function update(req, res) {
   res.json(task)
 }
 
+export function reassign(req, res) {
+  const existing = taskRepo.findById(req.params.id)
+  if (!existing) return res.status(404).json({ error: 'Task not found' })
+  if (existing.completed_at) return res.status(400).json({ error: 'Cannot reassign a completed task' })
+
+  const task = taskRepo.reassign(req.params.id, req.body)
+  res.json(task)
+}
+
 export function remove(req, res) {
   const deleted = taskRepo.remove(req.params.id)
   if (!deleted) return res.status(404).json({ error: 'Task not found (or is a scheduled task)' })
