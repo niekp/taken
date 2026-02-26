@@ -56,15 +56,15 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
   if (isGhost) {
     return (
       <div className="task-card opacity-40 pointer-events-none" style={{ borderLeftWidth: '3px', borderLeftStyle: 'dashed', borderLeftColor: '#d1d5db' }}>
-        <div className="flex items-start gap-3 bg-white p-4 mb-3 rounded-xl">
-          <div className="mt-0.5 w-6 h-6 rounded-full border-2 border-dashed border-gray-300 flex-shrink-0 flex items-center justify-center">
-            <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-start gap-2.5 px-3 py-2 rounded-xl">
+          <div className="mt-0.5 w-5 h-5 rounded-full border-2 border-dashed border-gray-300 flex-shrink-0 flex items-center justify-center">
+            <svg className="w-2.5 h-2.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm truncate text-gray-400">{task.title}</p>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-gray-300">Volgende</span>
               {task.category && (
                 <span className="text-xs text-gray-300">{task.category}</span>
@@ -147,7 +147,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
           transition: swipeX === 0 ? 'transform 0.3s ease-out' : 'none'
         }}
       >
-        <div className="flex items-start gap-3 bg-white p-4 mb-3 rounded-xl">
+        <div className="flex items-start gap-2.5 px-3 py-2 rounded-xl">
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -158,14 +158,14 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
                 onComplete()
               }
             }}
-            className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
+            className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
               isCompleted
                 ? 'bg-accent-mint border-accent-mint'
                 : 'border-gray-300 hover:border-accent-mint bg-white group-hover:shadow-soft'
             }`}
           >
             {isCompleted && (
-              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
             )}
@@ -175,33 +175,33 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
             <p className={`font-medium truncate transition-all ${isCompleted ? 'line-through text-gray-400' : 'text-gray-700'} ${presentationMode ? 'text-base' : 'text-sm'}`}>
               {task.title}
             </p>
-            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              <span className={`inline-flex items-center text-xs px-2.5 py-1 rounded-lg font-medium ${config.bgLight} ${config.text}`}>
+            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+              <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-md font-medium ${config.bgLight} ${config.text}`}>
                 {assigneeAvatar ? (
-                  <img src={assigneeAvatar} alt={assignee} className="w-4 h-4 rounded-full object-cover mr-1.5" />
+                  <img src={assigneeAvatar} alt={assignee} className="w-3.5 h-3.5 rounded-full object-cover mr-1" />
                 ) : null}
                 {assignee}
               </span>
               {task.schedule_id && (
-                <span className="inline-flex items-center text-xs px-2 py-1 rounded-lg font-medium bg-gray-100 text-gray-400">
-                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-100 text-gray-400">
+                  <svg className="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                   {task.interval_days}d
                 </span>
               )}
               {task.category && (
-                <span className="inline-flex items-center text-xs px-2 py-1 rounded-lg font-medium bg-pastel-lavender/30 text-gray-500">
+                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-pastel-lavender/30 text-gray-500">
                   {task.category}
                 </span>
               )}
               {isOverdue && !isCompleted && (
-                <span className="inline-flex items-center text-xs px-2 py-1 rounded-lg font-medium bg-red-50 text-red-600">
+                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-red-50 text-red-600">
                   Uitgesteld
                 </span>
               )}
               {isCompleted && completedByUser && (
-                <span className="inline-flex items-center text-xs px-2 py-1 rounded-lg font-medium bg-green-50 text-green-600">
+                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-green-50 text-green-600">
                   {completedByUser.name}
                 </span>
               )}
