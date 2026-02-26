@@ -11,6 +11,7 @@ export default function BoodschappenView({ onOpenMenu }) {
   const [showSpec, setShowSpec] = useState(false)
   const [adding, setAdding] = useState(false)
   const [completing, setCompleting] = useState({})
+  const [showRecent, setShowRecent] = useState(false)
   const inputRef = useRef(null)
   const specRef = useRef(null)
 
@@ -47,7 +48,8 @@ export default function BoodschappenView({ onOpenMenu }) {
       setInputValue('')
       setInputSpec('')
       setShowSpec(false)
-      loadItems()
+      await loadItems()
+      window.scrollTo({ top: 0 })
       inputRef.current?.focus()
     } catch (err) {
       console.error('Failed to add item:', err)
@@ -172,15 +174,26 @@ export default function BoodschappenView({ onOpenMenu }) {
             </div>
           ))}
 
-          {/* Recently completed items */}
+          {/* Recently completed items (collapsible) */}
           {recentItems.length > 0 && (
             <>
-              <div className="flex items-center gap-2 pt-4">
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Recent afgevinkt</p>
+              <button
+                onClick={() => setShowRecent(!showRecent)}
+                className="flex items-center gap-2 pt-4 w-full"
+              >
+                <svg
+                  className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showRecent ? 'rotate-90' : ''}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                  Recent afgevinkt ({recentItems.length})
+                </p>
                 <div className="flex-1 h-px bg-gray-200"></div>
-              </div>
+              </button>
 
-              {recentItems.map(item => (
+              {showRecent && recentItems.map(item => (
                 <div
                   key={item.uuid}
                   className="bg-white/60 rounded-2xl shadow-card px-4 py-3 flex items-center gap-3"
