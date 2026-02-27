@@ -24,6 +24,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
   const [revealed, setRevealed] = useState(null) // null, 'left' (delete), or 'right' (postpone)
   const [isDragging, setIsDragging] = useState(false)
   const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
   const swipeDirection = useRef(null)
   const actionTapped = useRef(false) // suppress parent click after action button tap
 
@@ -38,6 +39,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
   function handleTouchStart(e) {
     if (isGhost || isCompleted) return
     touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
     swipeDirection.current = null
     setIsDragging(true)
   }
@@ -45,10 +47,21 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
   function handleTouchMove(e) {
     if (!touchStartX.current) return
     const diff = e.touches[0].clientX - touchStartX.current
+    const diffY = e.touches[0].clientY - touchStartY.current
 
-    // Lock direction after a small threshold
-    if (!swipeDirection.current && Math.abs(diff) > 10) {
-      swipeDirection.current = diff < 0 ? 'left' : 'right'
+    // Lock direction after a threshold — only lock to horizontal
+    // if horizontal movement clearly exceeds vertical (prevents
+    // accidental swipe while scrolling)
+    if (!swipeDirection.current && Math.abs(diff) > 20) {
+      if (Math.abs(diff) > Math.abs(diffY) * 1.5) {
+        swipeDirection.current = diff < 0 ? 'left' : 'right'
+      } else {
+        // Vertical scroll detected — cancel swipe entirely
+        touchStartX.current = null
+        touchStartY.current = null
+        setIsDragging(false)
+        return
+      }
     }
 
     if (swipeDirection.current === 'left' && canSwipeLeft) {
@@ -60,7 +73,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
 
   function handleTouchEnd() {
     if (swipeDirection.current === 'left' && canSwipeLeft) {
-      if (swipeX < -30) {
+      if (swipeX < -50) {
         // Snap open to reveal delete button
         setSwipeX(-80)
         setRevealed('left')
@@ -69,7 +82,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
         setRevealed(null)
       }
     } else if (swipeDirection.current === 'right' && canSwipeRight) {
-      if (swipeX > 30) {
+      if (swipeX > 50) {
         // Snap open to reveal postpone button
         setSwipeX(80)
         setRevealed('right')
@@ -82,6 +95,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
       setRevealed(null)
     }
     touchStartX.current = null
+    touchStartY.current = null
     swipeDirection.current = null
     setIsDragging(false)
   }
