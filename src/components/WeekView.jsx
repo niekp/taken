@@ -133,6 +133,15 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     }
   }
 
+  async function handlePostponeTask(task) {
+    try {
+      await api.postponeTask(task.id)
+      loadData()
+    } catch (err) {
+      console.error('Failed to postpone task:', err)
+    }
+  }
+
   function formatDate(date) {
     return date.getDate()
   }
@@ -530,6 +539,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                     onEdit={(t) => { setEditTask(t); setShowModal(true) }}
                     onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
                     onDeleteAttempt={() => setResetKey(k => k + 1)}
+                    onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
                     users={users}
                     isToday={isToday}
                     presentationMode={false}

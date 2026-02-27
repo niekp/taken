@@ -105,6 +105,26 @@ export function reassign(id, { assigned_to, is_both }) {
 }
 
 /**
+ * Postpone a task to tomorrow. Works for both scheduled and one-off tasks.
+ * Only uncompleted tasks can be postponed.
+ */
+export function postpone(id) {
+  const db = getDb()
+  const task = findById(id)
+  if (!task || task.completed_at) return null
+
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = formatDateLocal(tomorrow)
+
+  db.prepare(`
+    UPDATE tasks SET date = ?
+    WHERE id = ? AND completed_at IS NULL
+  `).run(tomorrowStr, id)
+  return findById(id)
+}
+
+/**
  * Complete a task. If it belongs to a schedule, generate the next occurrence.
  * @returns {{ task: object, nextTask: object|null }}
  */

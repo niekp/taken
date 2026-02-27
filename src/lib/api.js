@@ -84,6 +84,10 @@ export const api = {
     body: JSON.stringify({ assigned_to, is_both }),
   }),
 
+  postponeTask: (id) => request(`/tasks/${id}/postpone`, {
+    method: 'POST',
+  }),
+
   deleteTask: (id) => request(`/tasks/${id}`, {
     method: 'DELETE',
   }),

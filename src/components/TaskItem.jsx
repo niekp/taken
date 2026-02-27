@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 
-export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDelete, onDeleteAttempt, users, isToday, presentationMode, resetKey }) {
+export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDelete, onDeleteAttempt, onPostpone, users, isToday, presentationMode, resetKey }) {
   const isCompleted = !!task.completed_at
   const isGhost = !!task.is_ghost
   const isOverdue = task.original_date && task.date !== task.original_date
@@ -22,34 +22,61 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
 
   const [swipeX, setSwipeX] = useState(0)
   const touchStartX = useRef(null)
+  const swipeDirection = useRef(null) // 'left' or 'right', locked after first significant move
+
+  const canSwipeLeft = !isGhost && !isCompleted && !task.schedule_id && onDelete
+  const canSwipeRight = !isGhost && !isCompleted && onPostpone
 
   useEffect(() => {
     setSwipeX(0)
   }, [resetKey])
 
   function handleTouchStart(e) {
-    if (isGhost || task.schedule_id) return // can't swipe-delete scheduled/ghost tasks
+    if (isGhost || isCompleted) return
     touchStartX.current = e.touches[0].clientX
+    swipeDirection.current = null
   }
 
   function handleTouchMove(e) {
     if (!touchStartX.current) return
     const diff = e.touches[0].clientX - touchStartX.current
-    if (diff < 0) {
+
+    // Lock direction after a small threshold
+    if (!swipeDirection.current && Math.abs(diff) > 10) {
+      swipeDirection.current = diff < 0 ? 'left' : 'right'
+    }
+
+    if (swipeDirection.current === 'left' && canSwipeLeft) {
       setSwipeX(Math.max(diff, -100))
+    } else if (swipeDirection.current === 'right' && canSwipeRight) {
+      setSwipeX(Math.min(diff, 100))
     }
   }
 
   function handleTouchEnd() {
-    if (swipeX < -60 && onDelete) {
-      onDeleteAttempt?.()
-      onDelete()
-    } else if (swipeX < -30) {
-      setSwipeX(-80)
+    if (swipeDirection.current === 'left') {
+      if (swipeX < -60 && onDelete) {
+        onDeleteAttempt?.()
+        onDelete()
+      } else if (swipeX < -30) {
+        setSwipeX(-80)
+      } else {
+        setSwipeX(0)
+      }
+    } else if (swipeDirection.current === 'right') {
+      if (swipeX > 60 && onPostpone) {
+        onPostpone()
+        setSwipeX(0)
+      } else if (swipeX > 30) {
+        setSwipeX(80)
+      } else {
+        setSwipeX(0)
+      }
     } else {
       setSwipeX(0)
     }
     touchStartX.current = null
+    swipeDirection.current = null
   }
 
   // Ghost tasks - preview style
@@ -129,6 +156,19 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
       onTouchEnd={handleTouchEnd}
       className="relative overflow-hidden"
     >
+      {/* Postpone action (right swipe reveals left side) */}
+      <div
+        className={`absolute left-0 top-0 bottom-0 w-20 bg-amber-500 flex items-center justify-center transition-opacity duration-200 ${swipeX > 10 ? 'opacity-100' : 'opacity-0'}`}
+        style={{ borderRadius: '0.75rem' }}
+      >
+        <div className="flex flex-col items-center gap-0.5">
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-white text-xs font-medium">Morgen</span>
+        </div>
+      </div>
+      {/* Delete action (left swipe reveals right side) */}
       <div
         className={`absolute right-0 top-0 bottom-0 w-20 bg-red-500 flex items-center justify-center transition-opacity duration-200 ${swipeX < -10 ? 'opacity-100' : 'opacity-0'}`}
         style={{ borderRadius: '0.75rem' }}
