@@ -71,15 +71,18 @@ export default function BoodschappenView({ onOpenMenu }) {
     const vv = window.visualViewport
     if (!vv) return
 
-    function onResize() {
-      const keyboardH = window.innerHeight - vv.height
+    function onViewportChange() {
+      // On iOS, when keyboard is open and user scrolls, vv.offsetTop changes
+      // as the browser pans the visual viewport within the layout viewport.
+      // We need to account for this to keep the input bar pinned correctly.
+      const keyboardH = window.innerHeight - vv.height - vv.offsetTop
       setKeyboardOffset(keyboardH > 50 ? keyboardH : 0)
     }
-    vv.addEventListener('resize', onResize)
-    vv.addEventListener('scroll', onResize)
+    vv.addEventListener('resize', onViewportChange)
+    vv.addEventListener('scroll', onViewportChange)
     return () => {
-      vv.removeEventListener('resize', onResize)
-      vv.removeEventListener('scroll', onResize)
+      vv.removeEventListener('resize', onViewportChange)
+      vv.removeEventListener('scroll', onViewportChange)
     }
   }, [])
 
