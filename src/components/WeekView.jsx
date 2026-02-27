@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../lib/api'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
@@ -7,6 +7,7 @@ import useLiveSync from '../hooks/useLiveSync'
 
 const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
+const MONTH_NAMES = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
 export default function WeekView({ currentUser, users, onComplete, presentationMode, onTogglePresentation, onOpenMenu }) {
   const [tasks, setTasks] = useState([])
@@ -16,25 +17,11 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [filter, setFilter] = useState('all')
-  const [currentWeekOffset, setCurrentWeekOffset] = useState(0)
   const [resetKey, setResetKey] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
-  const today = new Date()
-  const currentDayIndex = today.getDay() === 0 ? 6 : today.getDay() - 1
-  const [activeDay, setActiveDay] = useState(currentDayIndex)
-
-  function getWeekDates(offset = 0) {
-    const start = new Date(today)
-    start.setDate(today.getDate() - currentDayIndex + (offset * 7))
-    return DAYS.map((_, i) => {
-      const d = new Date(start)
-      d.setDate(start.getDate() + i)
-      return d
-    })
-  }
-
-  const weekDates = getWeekDates(currentWeekOffset)
+  const dateBarRef = useRef(null)
+  const selectedDateRef = useRef(null)
 
   function formatDateISO(d) {
     const year = d.getFullYear()
@@ -42,6 +29,47 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     const day = String(d.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
   }
+
+  const todayStr = formatDateISO(new Date())
+  const [selectedDate, setSelectedDate] = useState(todayStr)
+
+  // Build the scrollable date range: 4 weeks back to 4 weeks forward
+  const dateRange = useCallback(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const dates = []
+    for (let i = -28; i <= 28; i++) {
+      const d = new Date(today)
+      d.setDate(today.getDate() + i)
+      dates.push(d)
+    }
+    return dates
+  }, [todayStr])()
+
+  // Derive the week (Mon-Sun) containing the selected date for API calls
+  function getWeekForDate(isoDate) {
+    const d = new Date(isoDate + 'T00:00:00')
+    const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1 // 0=Mon
+    const monday = new Date(d)
+    monday.setDate(d.getDate() - dayOfWeek)
+    return DAYS.map((_, i) => {
+      const wd = new Date(monday)
+      wd.setDate(monday.getDate() + i)
+      return wd
+    })
+  }
+
+  const weekDates = getWeekForDate(selectedDate)
+  const selectedDayIndex = weekDates.findIndex(d => formatDateISO(d) === selectedDate)
+  const isCurrentWeek = weekDates.some(d => formatDateISO(d) === todayStr)
+  const selectedDayName = DAY_NAMES[selectedDayIndex] || ''
+
+  // Scroll the selected date into view on mount
+  useEffect(() => {
+    if (selectedDateRef.current) {
+      selectedDateRef.current.scrollIntoView({ inline: 'center', block: 'nearest' })
+    }
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -51,7 +79,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [currentWeekOffset])
+  }, [selectedDate])
 
   async function loadData() {
     const from = formatDateISO(weekDates[0])
@@ -59,7 +87,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
     try {
       // Run housekeeping on current week load
-      if (currentWeekOffset === 0) {
+      if (isCurrentWeek) {
         await api.runHousekeeping()
       }
 
@@ -165,14 +193,6 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     return date.getDate()
   }
 
-  function getWeekRange() {
-    const start = weekDates[0]
-    const end = weekDates[6]
-    const startStr = `${start.getDate()}/${start.getMonth() + 1}`
-    const endStr = `${end.getDate()}/${end.getMonth() + 1}`
-    return `${startStr} - ${endStr}`
-  }
-
   function getMealForDay(dayIndex) {
     const dateStr = formatDateISO(weekDates[dayIndex])
     return meals.find(m => m.date === dateStr)
@@ -181,6 +201,21 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   function getDailyEntriesForDay(dayIndex) {
     const dateStr = formatDateISO(weekDates[dayIndex])
     return dailyEntries[dateStr] || []
+  }
+
+  function goToToday() {
+    setSelectedDate(todayStr)
+    // Scroll into view after state update
+    setTimeout(() => {
+      if (selectedDateRef.current) {
+        selectedDateRef.current.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+      }
+    }, 50)
+  }
+
+  function getDayAbbr(d) {
+    const dow = d.getDay() === 0 ? 6 : d.getDay() - 1
+    return DAYS[dow]
   }
 
   function renderDayInfoCard(dayIndex, compact = false) {
@@ -266,28 +301,9 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
           <div className="text-center">
             <h1 className="text-xl md:text-3xl font-bold text-gray-800">Huishouden</h1>
-            <div className="flex items-center justify-center gap-2 md:gap-3 mt-1 md:mt-2">
-              <button
-                onClick={() => setCurrentWeekOffset(prev => prev - 1)}
-                className="p-1.5 md:p-2 hover:bg-white/60 rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <p className="text-sm md:text-lg text-gray-500 font-medium min-w-[140px] md:min-w-[180px] text-center">{getWeekRange()}</p>
-              <button
-                onClick={() => setCurrentWeekOffset(prev => prev + 1)}
-                className="p-1.5 md:p-2 hover:bg-white/60 rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-            {currentWeekOffset === 0 && (
-              <p className="text-accent-mint text-sm md:text-lg font-semibold mt-1 md:mt-2">Vandaag: {DAY_NAMES[currentDayIndex]}</p>
-            )}
+            <p className="text-sm md:text-lg text-gray-500 font-medium mt-1 md:mt-2">
+              {weekDates[0].getDate()} {MONTH_NAMES[weekDates[0].getMonth()]} – {weekDates[6].getDate()} {MONTH_NAMES[weekDates[6].getMonth()]}
+            </p>
           </div>
 
           <div className="flex items-center gap-2 md:gap-3">
@@ -314,7 +330,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         <div className="md:flex-1 md:flex md:gap-4 md:overflow-x-auto hidden">
            {DAYS.map((day, i) => {
             const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(i)
-            const isToday = i === currentDayIndex && currentWeekOffset === 0
+            const isToday = formatDateISO(weekDates[i]) === todayStr
             const hasItems = dayTasks.length > 0 || dayGhosts.length > 0
 
             return (
@@ -365,13 +381,13 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         <div className="flex-1 md:hidden flex flex-col overflow-hidden">
           <div className="flex gap-2 overflow-x-auto pb-2 mb-3 snap-x">
             {DAYS.map((day, i) => {
-              const isToday = i === currentDayIndex && currentWeekOffset === 0
+              const isToday = formatDateISO(weekDates[i]) === todayStr
               return (
                 <button
                   key={i}
-                  onClick={() => setActiveDay(i)}
+                  onClick={() => setSelectedDate(formatDateISO(weekDates[i]))}
                   className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all snap-start ${
-                    activeDay === i
+                    selectedDayIndex === i
                       ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-soft'
                       : isToday
                         ? 'bg-white shadow-card text-gray-700'
@@ -387,20 +403,20 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
           <div className="flex-1 overflow-y-auto bg-white/60 rounded-2xl">
             <div className={`text-center p-3 transition-all duration-300 ${
-              activeDay === currentDayIndex && currentWeekOffset === 0
+              selectedDate === todayStr
                 ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg rounded-t-2xl'
                 : 'bg-white shadow-sm rounded-t-2xl'
             }`}>
-              <p className={`font-medium ${activeDay === currentDayIndex && currentWeekOffset === 0 ? 'text-white/80' : 'text-gray-500'}`}>{DAY_NAMES[activeDay]}</p>
-              <p className={`text-3xl font-bold mt-1 ${activeDay === currentDayIndex && currentWeekOffset === 0 ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[activeDay])}</p>
+              <p className={`font-medium ${selectedDate === todayStr ? 'text-white/80' : 'text-gray-500'}`}>{selectedDayName}</p>
+              <p className={`text-3xl font-bold mt-1 ${selectedDate === todayStr ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[selectedDayIndex])}</p>
             </div>
 
             <div className="p-3 space-y-2">
               {(() => {
-                const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(activeDay)
+                const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(selectedDayIndex)
                 return (
                   <>
-                    {renderDayInfoCard(activeDay)}
+                    {renderDayInfoCard(selectedDayIndex)}
                     {renderGroupedTasks(
                       taskGroups,
                       completedTasks,
@@ -411,7 +427,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                           onComplete={() => handleCompleteTask(task)}
                           onUncomplete={() => handleUncompleteTask(task)}
                           users={users}
-                          isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
+                          isToday={selectedDate === todayStr}
                           presentationMode={true}
                           showCategory={showCategory}
                         />
@@ -421,7 +437,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                       ),
                       true
                     )}
-                    {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(activeDay) && getDailyEntriesForDay(activeDay).length === 0 && (
+                    {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(selectedDayIndex) && getDailyEntriesForDay(selectedDayIndex).length === 0 && (
                       <div className="text-center text-gray-400 py-8">
                         Geen taken
                       </div>
@@ -457,28 +473,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             </svg>
           </button>
 
-          <div className="text-center">
-            <h1 className="text-lg font-semibold text-gray-800">Huishouden</h1>
-            <div className="flex items-center justify-center gap-2 mt-0.5">
-              <button
-                onClick={() => setCurrentWeekOffset(prev => prev - 1)}
-                className="p-1 hover:bg-white/50 rounded"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <p className="text-gray-400 text-xs">{getWeekRange()}</p>
-              <button
-                onClick={() => setCurrentWeekOffset(prev => prev + 1)}
-                className="p-1 hover:bg-white/50 rounded"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          <h1 className="text-lg font-semibold text-gray-800">Huishouden</h1>
 
           <button onClick={onTogglePresentation} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors" title="Presentatie modus">
             <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -522,19 +517,32 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         </div>
       </div>
 
-      <div className="px-3 py-4">
-        <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
-          {DAYS.map((day, i) => {
-            const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(i)
-            const isActive = i === activeDay
-            const isToday = i === currentDayIndex && currentWeekOffset === 0
-            const hasTasks = dayTasks.length > 0 || dayGhosts.length > 0
+      <div className="px-3 pt-3 pb-1">
+        <div
+          ref={dateBarRef}
+          className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-hide"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {dateRange.map((d, i) => {
+            const iso = formatDateISO(d)
+            const isActive = iso === selectedDate
+            const isToday = iso === todayStr
+            const dayIdx = weekDates.findIndex(wd => formatDateISO(wd) === iso)
+            const hasTasks = dayIdx >= 0 && (() => {
+              const { tasks: dt, ghosts: dg } = getItemsForDay(dayIdx)
+              return dt.length > 0 || dg.length > 0
+            })()
+
+            // Show month label when month changes
+            const prevDate = i > 0 ? dateRange[i - 1] : null
+            const showMonth = !prevDate || prevDate.getMonth() !== d.getMonth()
 
             return (
               <button
-                key={i}
-                onClick={() => setActiveDay(i)}
-                className={`day-tab min-w-[48px] ${
+                key={iso}
+                ref={isActive ? selectedDateRef : undefined}
+                onClick={() => setSelectedDate(iso)}
+                className={`day-tab min-w-[56px] flex-shrink-0 snap-center relative ${
                   isActive
                     ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-soft'
                     : isToday
@@ -542,23 +550,39 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                       : 'bg-white/50 text-gray-500 hover:bg-white'
                 }`}
               >
-                <p className="text-xs opacity-70">{day}</p>
-                <p className="text-lg font-semibold mt-0.5">{formatDate(weekDates[i])}</p>
+                {showMonth && (
+                  <p className={`text-[9px] font-semibold uppercase tracking-wider mb-0.5 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                    {MONTH_NAMES[d.getMonth()]}
+                  </p>
+                )}
+                <p className={`text-xs ${showMonth ? '' : 'mt-3'} ${isActive ? 'text-white/80' : 'opacity-70'}`}>{getDayAbbr(d)}</p>
+                <p className="text-lg font-semibold mt-0.5">{d.getDate()}</p>
                 {hasTasks && !isActive && (
-                  <span className="w-1.5 h-1.5 bg-accent-mint rounded-full mx-auto mt-1.5"></span>
+                  <span className="w-1.5 h-1.5 bg-accent-mint rounded-full mx-auto mt-1"></span>
                 )}
               </button>
             )
           })}
         </div>
+
+        {selectedDate !== todayStr && (
+          <div className="flex justify-center mt-1 mb-0.5">
+            <button
+              onClick={goToToday}
+              className="text-xs font-medium text-accent-mint bg-pastel-mint/30 hover:bg-pastel-mint/50 px-3 py-1 rounded-full transition-colors"
+            >
+              Vandaag
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="px-4 pb-32">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800">
-            {DAY_NAMES[activeDay]}
+            {selectedDayName}
           </h2>
-          {activeDay === currentDayIndex && currentWeekOffset === 0 && (
+          {selectedDate === todayStr && (
             <span className="text-xs font-medium text-accent-mint bg-pastel-mint/30 px-3 py-1 rounded-full">
               Vandaag
             </span>
@@ -567,11 +591,11 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
         <div className="space-y-3">
           {(() => {
-            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(activeDay)
-            const isToday = activeDay === currentDayIndex && currentWeekOffset === 0
+            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(selectedDayIndex)
+            const isToday = selectedDate === todayStr
             return (
               <>
-                {renderDayInfoCard(activeDay)}
+                {renderDayInfoCard(selectedDayIndex)}
                 {renderGroupedTasks(
                   taskGroups,
                   completedTasks,
@@ -596,7 +620,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                     <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={false} />
                   )
                 )}
-                {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(activeDay) && getDailyEntriesForDay(activeDay).length === 0 && (
+                {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(selectedDayIndex) && getDailyEntriesForDay(selectedDayIndex).length === 0 && (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-pastel-lavender/50 rounded-2xl mx-auto mb-4 flex items-center justify-center">
                       <svg className="w-8 h-8 text-pastel-lavenderDark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -627,8 +651,8 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
       {showModal && (
         <TaskModal
-          date={editTask?.date || formatDateISO(weekDates[activeDay])}
-          dayName={DAY_NAMES[activeDay]}
+          date={editTask?.date || selectedDate}
+          dayName={selectedDayName}
           onClose={() => {
             setShowModal(false)
             setEditTask(null)
