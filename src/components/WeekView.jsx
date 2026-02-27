@@ -97,7 +97,28 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
       return 0
     })
 
-    return { tasks: dayTasks, ghosts: dayGhosts }
+    // Group by category: uncategorized first, then each category in order seen
+    // Merge ghosts into the same groups so they appear under their category
+    const uncategorized = []
+    const categoryMap = new Map()
+    for (const task of [...dayTasks, ...dayGhosts]) {
+      const cat = task.category || null
+      if (!cat) {
+        uncategorized.push(task)
+      } else {
+        if (!categoryMap.has(cat)) categoryMap.set(cat, [])
+        categoryMap.get(cat).push(task)
+      }
+    }
+    const taskGroups = []
+    if (uncategorized.length > 0) {
+      taskGroups.push({ category: null, items: uncategorized })
+    }
+    for (const [category, catItems] of categoryMap) {
+      taskGroups.push({ category, items: catItems })
+    }
+
+    return { tasks: dayTasks, ghosts: dayGhosts, taskGroups }
   }
 
   async function handleCompleteTask(task) {
@@ -207,6 +228,25 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     )
   }
 
+  /** Render grouped task list with category headers */
+  function renderGroupedTasks(taskGroups, renderTask, renderGhost, compact = false) {
+    return (
+      <>
+        {taskGroups.map(({ category, items }) => (
+          <div key={category || '_uncategorized'}>
+            {category && (
+              <div className={`flex items-center gap-2 ${compact ? 'mt-1.5 mb-0.5' : 'mt-4 mb-1.5'} ${taskGroups[0]?.category === category && !taskGroups.find(g => !g.category) ? (compact ? '' : 'mt-1') : ''}`}>
+                <p className={`${compact ? 'text-[10px]' : 'text-xs'} font-medium text-gray-400 uppercase tracking-wide`}>{category}</p>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+            )}
+            {items.map(item => item.is_ghost ? renderGhost(item) : renderTask(item))}
+          </div>
+        ))}
+      </>
+    )
+  }
+
   if (presentationMode) {
     return (
       <div className="h-screen p-4 md:p-6 bg-gradient-to-br from-pastel-cream to-pastel-mint/20 overflow-hidden flex flex-col">
@@ -262,7 +302,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         {/* Desktop: all days side by side */}
         <div className="md:flex-1 md:flex md:gap-4 md:overflow-x-auto hidden">
            {DAYS.map((day, i) => {
-            const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(i)
+            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups } = getItemsForDay(i)
             const isToday = i === currentDayIndex && currentWeekOffset === 0
             const hasItems = dayTasks.length > 0 || dayGhosts.length > 0
 
@@ -279,20 +319,24 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
                   {renderDayInfoCard(i, true)}
-                  {dayTasks.map(task => (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      onComplete={() => handleCompleteTask(task)}
-                      onUncomplete={() => handleUncompleteTask(task)}
-                      users={users}
-                      isToday={isToday}
-                      presentationMode={true}
-                    />
-                  ))}
-                  {dayGhosts.map(ghost => (
-                    <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
-                  ))}
+                  {renderGroupedTasks(
+                    taskGroups,
+                    task => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        onComplete={() => handleCompleteTask(task)}
+                        onUncomplete={() => handleUncompleteTask(task)}
+                        users={users}
+                        isToday={isToday}
+                        presentationMode={true}
+                      />
+                    ),
+                    ghost => (
+                      <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
+                    ),
+                    true
+                  )}
                   {!hasItems && !getMealForDay(i) && getDailyEntriesForDay(i).length === 0 && (
                     <div className="text-center text-gray-400 py-8 text-sm">
                       Geen taken
@@ -340,24 +384,28 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
             <div className="p-3 space-y-2">
               {(() => {
-                const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(activeDay)
+                const { tasks: dayTasks, ghosts: dayGhosts, taskGroups } = getItemsForDay(activeDay)
                 return (
                   <>
                     {renderDayInfoCard(activeDay)}
-                    {dayTasks.map(task => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        onComplete={() => handleCompleteTask(task)}
-                        onUncomplete={() => handleUncompleteTask(task)}
-                        users={users}
-                        isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
-                        presentationMode={true}
-                      />
-                    ))}
-                    {dayGhosts.map(ghost => (
-                      <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
-                    ))}
+                    {renderGroupedTasks(
+                      taskGroups,
+                      task => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          onComplete={() => handleCompleteTask(task)}
+                          onUncomplete={() => handleUncompleteTask(task)}
+                          users={users}
+                          isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
+                          presentationMode={true}
+                        />
+                      ),
+                      ghost => (
+                        <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
+                      ),
+                      true
+                    )}
                     {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(activeDay) && getDailyEntriesForDay(activeDay).length === 0 && (
                       <div className="text-center text-gray-400 py-8">
                         Geen taken
@@ -504,30 +552,33 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
         <div className="space-y-3">
           {(() => {
-            const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(activeDay)
+            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups } = getItemsForDay(activeDay)
             const isToday = activeDay === currentDayIndex && currentWeekOffset === 0
             return (
               <>
                 {renderDayInfoCard(activeDay)}
-                {dayTasks.map(task => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    onComplete={() => handleCompleteTask(task)}
-                    onUncomplete={() => handleUncompleteTask(task)}
-                    onEdit={(t) => { setEditTask(t); setShowModal(true) }}
-                    onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
-                    onDeleteAttempt={() => setResetKey(k => k + 1)}
-                    onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
-                    users={users}
-                    isToday={isToday}
-                    presentationMode={false}
-                    resetKey={resetKey}
-                  />
-                ))}
-                {dayGhosts.map(ghost => (
-                  <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={false} />
-                ))}
+                {renderGroupedTasks(
+                  taskGroups,
+                  task => (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      onComplete={() => handleCompleteTask(task)}
+                      onUncomplete={() => handleUncompleteTask(task)}
+                      onEdit={(t) => { setEditTask(t); setShowModal(true) }}
+                      onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
+                      onDeleteAttempt={() => setResetKey(k => k + 1)}
+                      onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
+                      users={users}
+                      isToday={isToday}
+                      presentationMode={false}
+                      resetKey={resetKey}
+                    />
+                  ),
+                  ghost => (
+                    <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={false} />
+                  )
+                )}
                 {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(activeDay) && getDailyEntriesForDay(activeDay).length === 0 && (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-pastel-lavender/50 rounded-2xl mx-auto mb-4 flex items-center justify-center">

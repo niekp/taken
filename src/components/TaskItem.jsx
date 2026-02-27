@@ -119,9 +119,6 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
             <p className="font-medium text-sm truncate text-gray-400">{task.title}</p>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-gray-300">Volgende</span>
-              {task.category && (
-                <span className="text-xs text-gray-300">{task.category}</span>
-              )}
             </div>
           </div>
         </div>
@@ -304,11 +301,6 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                   {task.interval_days}d
-                </span>
-              )}
-              {task.category && (
-                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-pastel-lavender/30 text-gray-500">
-                  {task.category}
                 </span>
               )}
               {isOverdue && !isCompleted && (
