@@ -64,12 +64,19 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   const isCurrentWeek = weekDates.some(d => formatDateISO(d) === todayStr)
   const selectedDayName = DAY_NAMES[selectedDayIndex] || ''
 
-  // Scroll the selected date into view on mount
+  // Scroll the selected date into view whenever it changes or loading finishes
+  const initialScrollDone = useRef(false)
   useEffect(() => {
-    if (selectedDateRef.current) {
-      selectedDateRef.current.scrollIntoView({ inline: 'center', block: 'nearest' })
-    }
-  }, [])
+    if (isLoading) return
+    // Wait one frame so the DOM has the ref element laid out
+    requestAnimationFrame(() => {
+      if (selectedDateRef.current) {
+        const smooth = initialScrollDone.current
+        selectedDateRef.current.scrollIntoView({ inline: 'center', block: 'nearest', behavior: smooth ? 'smooth' : 'instant' })
+        initialScrollDone.current = true
+      }
+    })
+  }, [selectedDate, isLoading])
 
   useEffect(() => {
     loadData()
@@ -205,12 +212,6 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
   function goToToday() {
     setSelectedDate(todayStr)
-    // Scroll into view after state update
-    setTimeout(() => {
-      if (selectedDateRef.current) {
-        selectedDateRef.current.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
-      }
-    }, 50)
   }
 
   function getDayAbbr(d) {
