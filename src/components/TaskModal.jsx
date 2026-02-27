@@ -82,7 +82,7 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
   const bothColor = BOTH_COLOR
   const assigneeOptions = [
     { value: 'both', label: 'Samen', bg: bothColor.bgLight, activeBg: bothColor.bg },
-    ...users.map(u => {
+    ...users.filter(u => u.can_do_chores).map(u => {
       const c = getUserColor(u)
       return { value: u.id, label: u.name, bg: c.bgLight, activeBg: c.bg }
     }),

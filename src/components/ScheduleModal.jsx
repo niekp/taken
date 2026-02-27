@@ -275,7 +275,7 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
               >
                 Samen
               </button>
-              {users.map(user => {
+              {users.filter(user => user.can_do_chores).map(user => {
                 const color = getUserColor(user)
                 const isSelected = !isBoth && assignedTo === user.id
                 return (

@@ -468,6 +468,36 @@ action_remove_user() {
   fi
 }
 
+action_set_chores() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Taken in/uitschakelen${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+
+  local users_output
+  users_output=$(exec_cli list-users 2>&1) || true
+  echo -e "$users_output" | sed 's/^/    /'
+  echo
+
+  local name
+  input_text name "Naam"
+  [[ -z "$name" ]] && return
+
+  local toggle_choice
+  if ! menu_select toggle_choice "Kan taken uitvoeren?" \
+    "Aan|Gebruiker kan taken uitvoeren" \
+    "Uit|Gebruiker kan geen taken uitvoeren"; then
+    return
+  fi
+
+  local value="on"
+  [[ "$toggle_choice" -eq 1 ]] && value="off"
+
+  local output
+  output=$(exec_cli set-chores "$name" "$value" 2>&1) || true
+  show_output "Resultaat" "$output"
+}
+
 action_status() {
   local output
   output=$(dc ps 2>&1) || output="${C_RED}Kon status niet ophalen.${C_RESET}"
@@ -584,6 +614,7 @@ user_menu() {
       "Gebruikers tonen|Alle geregistreerde gebruikers" \
       "Gebruiker toevoegen|Naam, PIN en kleur instellen" \
       "PIN wijzigen|Nieuwe PIN voor bestaande gebruiker" \
+      "Taken in/uitschakelen|Kan deze gebruiker taken uitvoeren?" \
       "Gebruiker verwijderen|Verwijder een gebruiker permanent"; then
       return
     fi
@@ -594,7 +625,8 @@ user_menu() {
       0) action_list_users ;;
       1) action_add_user ;;
       2) action_change_pin ;;
-      3) action_remove_user ;;
+      3) action_set_chores ;;
+      4) action_remove_user ;;
     esac
   done
 }

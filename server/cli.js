@@ -28,6 +28,7 @@ User Commands:
   list-users                          List all users
   add-user <name> <pin> [color]       Add a new user (PIN must be 4 digits)
   change-pin <name> <new-pin>         Change a user's PIN
+  set-chores <name> <on|off>          Toggle whether user can do chores
   remove-user <name>                  Remove a user (with confirmation)
 
 Bring! Commands:
@@ -45,6 +46,7 @@ Examples:
   node server/cli.js list-users
   node server/cli.js add-user "Alice" 1234 blue
   node server/cli.js change-pin "Alice" 5678
+  node server/cli.js set-chores "Kind" off
   node server/cli.js remove-user "Alice"
   node server/cli.js bring-login "user@example.com" "password123"
   node server/cli.js bring-lists
@@ -86,11 +88,12 @@ async function main() {
         console.log('No users found.')
       } else {
         console.log('\nUsers:')
-        console.log('-'.repeat(60))
+        console.log('-'.repeat(70))
         for (const user of users) {
-          console.log(`  ${user.name.padEnd(20)} Color: ${(user.color || 'blue').padEnd(8)} ID: ${user.id}`)
+          const chores = user.can_do_chores ? 'ja' : 'nee'
+          console.log(`  ${user.name.padEnd(20)} Color: ${(user.color || 'blue').padEnd(8)} Taken: ${chores.padEnd(4)} ID: ${user.id}`)
         }
-        console.log('-'.repeat(60))
+        console.log('-'.repeat(70))
         console.log(`Total: ${users.length} user(s)`)
       }
       break
@@ -139,6 +142,31 @@ async function main() {
 
       userRepo.updatePin(user.id, newPin)
       console.log(`PIN for "${name}" updated successfully`)
+      break
+    }
+
+    case 'set-chores': {
+      const name = args[1]
+      const value = args[2]
+      if (!name || !value) {
+        console.error('Usage: set-chores <name> <on|off>')
+        process.exit(1)
+      }
+
+      if (!['on', 'off'].includes(value.toLowerCase())) {
+        console.error('Error: Value must be "on" or "off"')
+        process.exit(1)
+      }
+
+      const user = userRepo.findByName(name)
+      if (!user) {
+        console.error(`Error: User "${name}" not found`)
+        process.exit(1)
+      }
+
+      const canDoChores = value.toLowerCase() === 'on'
+      userRepo.updateCanDoChores(user.id, canDoChores)
+      console.log(`Taken voor "${name}" ${canDoChores ? 'ingeschakeld' : 'uitgeschakeld'}`)
       break
     }
 

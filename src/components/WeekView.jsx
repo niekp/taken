@@ -226,7 +226,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
           <div className="flex items-center gap-2 md:gap-3">
             <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
-              {users.map(u => {
+              {users.filter(u => u.can_do_chores).map(u => {
                 const c = getUserColor(u)
                 return (
                   <div key={u.id} className="flex items-center gap-1">
@@ -441,7 +441,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             >
               Alle
             </button>
-            {users.map(u => {
+            {users.filter(u => u.can_do_chores).map(u => {
               const avatar = u.avatar_url
               return (
                 <button

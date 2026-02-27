@@ -9,6 +9,7 @@ import DagschemaView from './components/DagschemaView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
 import Confetti from './components/Confetti'
+import UserManagementView from './components/UserManagementView'
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
@@ -16,6 +17,7 @@ export default function App() {
   const [view, setView] = useState('weekly') // 'weekly' | 'meals' | 'schedules' | 'boodschappen' | 'dagschema'
   const [showMenu, setShowMenu] = useState(false)
   const [showStats, setShowStats] = useState(false)
+  const [showUserManagement, setShowUserManagement] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [bringEnabled, setBringEnabled] = useState(false)
   const [presentationMode, setPresentationMode] = useState(() => {
@@ -240,6 +242,10 @@ export default function App() {
             setShowMenu(false)
             setView('dagschema')
           }}
+          onOpenUserManagement={() => {
+            setShowMenu(false)
+            setShowUserManagement(true)
+          }}
         />
       )}
 
@@ -247,6 +253,27 @@ export default function App() {
         <Stats 
           onClose={() => setShowStats(false)}
           users={users}
+        />
+      )}
+
+      {showUserManagement && (
+        <UserManagementView
+          users={users}
+          onUsersChanged={async () => {
+            const data = await api.getUsers()
+            setUsers(data)
+            // Update currentUser if still present
+            if (currentUser) {
+              const updated = data.find(u => u.id === currentUser.id)
+              if (updated) {
+                setCurrentUser(updated)
+              } else {
+                // Current user was deleted
+                handleLogout()
+              }
+            }
+          }}
+          onClose={() => setShowUserManagement(false)}
         />
       )}
     </div>

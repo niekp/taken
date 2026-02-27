@@ -10,9 +10,12 @@ const router = Router()
 
 // Users
 router.get('/users', userController.list)
+router.post('/users', userController.createUser)
 router.post('/auth/login', userController.login)
-router.patch('/users/:id', userController.updateAvatar)
+router.patch('/users/:id', userController.updateUser)
 router.post('/users/:id/change-pin', userController.changePin)
+router.post('/users/:id/reset-pin', userController.resetPin)
+router.delete('/users/:id', userController.deleteUser)
 
 // Schedules
 router.get('/schedules/categories', scheduleController.categories)

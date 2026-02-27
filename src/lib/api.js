@@ -21,14 +21,28 @@ export const api = {
     body: JSON.stringify({ pin }),
   }),
 
+  createUser: (data) => request('/users', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
   updateUser: (id, updates) => request(`/users/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   }),
 
+  deleteUser: (id) => request(`/users/${id}`, {
+    method: 'DELETE',
+  }),
+
   changePin: (id, currentPin, newPin) => request(`/users/${id}/change-pin`, {
     method: 'POST',
     body: JSON.stringify({ currentPin, newPin }),
+  }),
+
+  resetPin: (id, newPin) => request(`/users/${id}/reset-pin`, {
+    method: 'POST',
+    body: JSON.stringify({ newPin }),
   }),
 
   // Schedules
