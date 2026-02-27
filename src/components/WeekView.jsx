@@ -276,8 +276,10 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                   {(() => {
                     const meal = getMealForDay(i)
                     return meal ? (
-                      <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200/60 rounded-xl">
-                        <span className="text-sm">🍽️</span>
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200/60 rounded-xl">
+                        <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
+                        </svg>
                         <span className="text-xs font-medium text-amber-800 truncate">{meal.meal_name}</span>
                       </div>
                     ) : null
@@ -349,7 +351,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                   <>
                     {renderDailyScheduleSummary(activeDay)}
                     {meal && (
-                      <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200/60 rounded-2xl">
+                      <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200/60 rounded-2xl">
                         <span className="text-lg">🍽️</span>
                         <span className="text-sm font-medium text-amber-800">{meal.meal_name}</span>
                       </div>
@@ -521,9 +523,11 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
               <>
                 {renderDailyScheduleSummary(activeDay)}
                 {meal && (
-                  <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200/60 rounded-2xl">
-                    <span className="text-lg">🍽️</span>
-                    <span className="text-sm font-medium text-amber-800">{meal.meal_name}</span>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200/60 rounded-2xl">
+                    <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
+                    </svg>
+                    <span className="text-xs font-medium text-amber-800">{meal.meal_name}</span>
                   </div>
                 )}
                 {dayTasks.map(task => (
