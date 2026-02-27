@@ -49,6 +49,7 @@ router.delete('/meals/:id', mealController.remove)
 // Bring! shopping list
 router.get('/bring/status', bringController.status)
 router.get('/bring/lists', bringController.getLists)
+router.get('/bring/catalog', bringController.getCatalog)
 router.get('/bring/items', bringController.getItems)
 router.post('/bring/items', bringController.addItem)
 router.post('/bring/items/complete', bringController.completeItem)

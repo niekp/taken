@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { api } from '../lib/api'
 
 const DAY_SHORT = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
@@ -10,24 +10,104 @@ function formatDateISO(d) {
   return `${year}-${month}-${day}`
 }
 
+/** Tiny component for a Bring! item image with fallback */
+function ItemImage({ src, alt, className = '' }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return (
+      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
+        <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+      </div>
+    )
+  }
+  return (
+    <div className={`bg-accent-mint/70 rounded-lg flex items-center justify-center ${className}`}>
+      <img
+        src={src}
+        alt={alt}
+        className="w-3/4 h-3/4 object-contain"
+        onError={() => setFailed(true)}
+        loading="lazy"
+      />
+    </div>
+  )
+}
+
 export default function BoodschappenView({ onOpenMenu }) {
   const [items, setItems] = useState([])
   const [recentItems, setRecentItems] = useState([])
   const [meals, setMeals] = useState([])
+  const [catalog, setCatalog] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [inputValue, setInputValue] = useState('')
   const [inputSpec, setInputSpec] = useState('')
   const [showSpec, setShowSpec] = useState(false)
-  const [adding, setAdding] = useState(false)
   const [completing, setCompleting] = useState({})
-  const [showRecent, setShowRecent] = useState(false)
+  const [showRecent, setShowRecent] = useState(() => {
+    try { return localStorage.getItem('boodschappen:showRecent') === 'true' } catch { return false }
+  })
+  const [showMeals, setShowMeals] = useState(() => {
+    try { return localStorage.getItem('boodschappen:showMeals') === 'true' } catch { return false }
+  })
+  const [keyboardOffset, setKeyboardOffset] = useState(0)
+  const [acSelected, setAcSelected] = useState(-1)
   const inputRef = useRef(null)
   const specRef = useRef(null)
+  const inputBarRef = useRef(null)
+
+  // Persist collapsed/expanded state
+  useEffect(() => {
+    try { localStorage.setItem('boodschappen:showRecent', String(showRecent)) } catch {}
+  }, [showRecent])
+  useEffect(() => {
+    try { localStorage.setItem('boodschappen:showMeals', String(showMeals)) } catch {}
+  }, [showMeals])
+
+  // Track keyboard open/close via visualViewport to move input bar up
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+
+    function onResize() {
+      const keyboardH = window.innerHeight - vv.height
+      setKeyboardOffset(keyboardH > 50 ? keyboardH : 0)
+    }
+    vv.addEventListener('resize', onResize)
+    vv.addEventListener('scroll', onResize)
+    return () => {
+      vv.removeEventListener('resize', onResize)
+      vv.removeEventListener('scroll', onResize)
+    }
+  }, [])
+
+  // Duplicate detection
+  const duplicateMatch = useMemo(() => {
+    const q = inputValue.trim().toLowerCase()
+    if (q.length < 2) return null
+    return items.find(item => item.itemId.toLowerCase().includes(q))
+  }, [inputValue, items])
+
+  // Autocomplete suggestions from catalog
+  const suggestions = useMemo(() => {
+    const q = inputValue.trim().toLowerCase()
+    if (q.length < 2 || !catalog.length) return []
+    // Filter catalog items matching the query, exclude items already on the list
+    const onList = new Set(items.map(i => i.itemId.toLowerCase()))
+    return catalog
+      .filter(c => c.name.toLowerCase().includes(q) && !onList.has(c.name.toLowerCase()))
+      .slice(0, 5)
+  }, [inputValue, catalog, items])
+
+  // Reset autocomplete selection when suggestions change
+  useEffect(() => { setAcSelected(-1) }, [suggestions])
 
   useEffect(() => {
     loadItems()
     loadMeals()
+    loadCatalog()
 
     function handleVisibilityChange() {
       if (!document.hidden) {
@@ -52,6 +132,16 @@ export default function BoodschappenView({ onOpenMenu }) {
     setLoading(false)
   }
 
+  /** Background sync — silently refreshes, never sets error/loading */
+  function syncItems() {
+    api.getBringItems()
+      .then(data => {
+        setItems(data.purchase || [])
+        setRecentItems(data.recently || [])
+      })
+      .catch(() => {}) // silent
+  }
+
   async function loadMeals() {
     try {
       const today = new Date()
@@ -61,57 +151,134 @@ export default function BoodschappenView({ onOpenMenu }) {
       const data = await api.getMeals(formatDateISO(today), formatDateISO(end))
       setMeals(data || [])
     } catch (err) {
-      // Meals are non-critical, just ignore errors
       console.error('Failed to load meals:', err)
     }
   }
 
-  async function handleAdd() {
-    const name = inputValue.trim()
-    if (!name || adding) return
-
-    setAdding(true)
+  async function loadCatalog() {
     try {
-      await api.addBringItem(name, inputSpec.trim())
-      setInputValue('')
-      setInputSpec('')
-      setShowSpec(false)
-      await loadItems()
-      window.scrollTo({ top: 0 })
-      inputRef.current?.focus()
+      const data = await api.getBringCatalog()
+      setCatalog(data || [])
     } catch (err) {
-      console.error('Failed to add item:', err)
+      console.error('Failed to load catalog:', err)
     }
-    setAdding(false)
   }
 
-  async function handleComplete(item) {
+  const handleAdd = useCallback((nameOverride, catalogItem) => {
+    const name = (nameOverride || inputValue).trim()
+    const spec = inputSpec.trim()
+    if (!name) return
+
+    // Try to find image from catalog if we got a suggestion object
+    const imageUrl = catalogItem?.imageUrl || null
+
+    // Optimistic: insert ghost item at top immediately
+    const ghostId = `_ghost_${Date.now()}`
+    const ghost = {
+      uuid: ghostId,
+      itemId: name,
+      specification: spec,
+      imageUrl,
+      _ghost: true,
+    }
+    setItems(prev => [ghost, ...prev])
+
+    // Clear input instantly
+    setInputValue('')
+    setInputSpec('')
+    setShowSpec(false)
+    inputRef.current?.focus()
+
+    // Fire API in background, then sync to reconcile
+    api.addBringItem(name, spec)
+      .then(() => syncItems())
+      .catch(err => {
+        console.error('Failed to add item:', err)
+        // Remove ghost on failure
+        setItems(prev => prev.filter(i => i.uuid !== ghostId))
+      })
+  }, [inputValue, inputSpec])
+
+  function handleSelectSuggestion(suggestion) {
+    handleAdd(suggestion.name, suggestion)
+  }
+
+  function handleComplete(item) {
+    // Optimistic: start completing animation, then remove from list
     setCompleting(prev => ({ ...prev, [item.uuid]: true }))
-    try {
-      await api.completeBringItem(item.itemId, item.uuid)
-      loadItems()
-    } catch (err) {
-      console.error('Failed to complete item:', err)
-    }
-    setCompleting(prev => ({ ...prev, [item.uuid]: false }))
+
+    // Remove after short animation
+    setTimeout(() => {
+      setItems(prev => prev.filter(i => i.uuid !== item.uuid))
+      setCompleting(prev => {
+        const next = { ...prev }
+        delete next[item.uuid]
+        return next
+      })
+    }, 300)
+
+    // Fire API in background, then sync
+    api.completeBringItem(item.itemId, item.uuid)
+      .then(() => syncItems())
+      .catch(err => {
+        console.error('Failed to complete item:', err)
+        // Re-add on failure
+        setItems(prev => [item, ...prev])
+        setCompleting(prev => {
+          const next = { ...prev }
+          delete next[item.uuid]
+          return next
+        })
+      })
   }
 
-  async function handleRemove(item) {
-    try {
-      await api.removeBringItem(item.itemId, item.uuid)
-      loadItems()
-    } catch (err) {
-      console.error('Failed to remove item:', err)
-    }
+  function handleRemove(item) {
+    // Optimistic: remove immediately
+    setItems(prev => prev.filter(i => i.uuid !== item.uuid))
+
+    api.removeBringItem(item.itemId, item.uuid)
+      .then(() => syncItems())
+      .catch(err => {
+        console.error('Failed to remove item:', err)
+        setItems(prev => [item, ...prev])
+      })
   }
 
-  async function handleReAdd(item) {
-    try {
-      await api.addBringItem(item.itemId, item.specification || '')
-      loadItems()
-    } catch (err) {
-      console.error('Failed to re-add item:', err)
+  function handleReAdd(item) {
+    // Optimistic: move from recent to purchase immediately
+    setRecentItems(prev => prev.filter(i => i.uuid !== item.uuid))
+    const ghost = { ...item, _ghost: true }
+    setItems(prev => [ghost, ...prev])
+
+    api.addBringItem(item.itemId, item.specification || '')
+      .then(() => syncItems())
+      .catch(err => {
+        console.error('Failed to re-add item:', err)
+        // Revert: move back to recent
+        setItems(prev => prev.filter(i => i.uuid !== item.uuid))
+        setRecentItems(prev => [item, ...prev])
+      })
+  }
+
+  function handleInputKeyDown(e) {
+    if (suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setAcSelected(prev => Math.min(prev + 1, suggestions.length - 1))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setAcSelected(prev => Math.max(prev - 1, -1))
+        return
+      }
+      if (e.key === 'Enter' && acSelected >= 0) {
+        e.preventDefault()
+        handleSelectSuggestion(suggestions[acSelected])
+        return
+      }
     }
+    if (e.key === 'Enter') handleAdd()
   }
 
   if (loading) {
@@ -163,30 +330,53 @@ export default function BoodschappenView({ onOpenMenu }) {
         </div>
       ) : (
         <div className="px-4 py-4 pb-44 space-y-3">
-          {/* Upcoming meals - compact */}
-          {meals.length > 0 && (
-            <div className="bg-white/70 rounded-2xl shadow-card px-4 py-3">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Komende maaltijden</p>
-              <div className="space-y-1">
-                {meals.map(meal => {
-                  const mealDate = new Date(meal.date + 'T00:00:00')
-                  const today = new Date()
-                  today.setHours(0, 0, 0, 0)
-                  const isToday = formatDateISO(mealDate) === formatDateISO(today)
-                  return (
-                    <div key={meal.id} className="flex items-center gap-2 min-w-0">
-                      <span className={`text-xs font-semibold w-6 flex-shrink-0 ${isToday ? 'text-accent-mint' : 'text-gray-400'}`}>
-                        {isToday ? 'Nu' : DAY_SHORT[mealDate.getDay()]}
-                      </span>
-                      <span className={`text-sm truncate ${isToday ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
-                        {meal.meal_name}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          {/* Upcoming meals - collapsible */}
+          {meals.length > 0 && (() => {
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const todayISO = formatDateISO(today)
+            const todayMeal = meals.find(m => m.date === todayISO)
+            return (
+              <button
+                onClick={() => setShowMeals(!showMeals)}
+                className="w-full bg-white/70 rounded-2xl shadow-card px-4 py-2.5 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <svg
+                    className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${showMeals ? 'rotate-90' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Maaltijden</p>
+                  {!showMeals && todayMeal && (
+                    <p className="text-xs text-gray-500 truncate ml-auto">
+                      <span className="text-accent-mint font-semibold">Nu</span>{' '}
+                      {todayMeal.meal_name}
+                    </p>
+                  )}
+                </div>
+                {showMeals && (
+                  <div className="space-y-1 mt-2">
+                    {meals.map(meal => {
+                      const mealDate = new Date(meal.date + 'T00:00:00')
+                      const isToday = meal.date === todayISO
+                      return (
+                        <div key={meal.id} className="flex items-center gap-2 min-w-0">
+                          <span className={`text-xs font-semibold w-6 flex-shrink-0 ${isToday ? 'text-accent-mint' : 'text-gray-400'}`}>
+                            {isToday ? 'Nu' : DAY_SHORT[mealDate.getDay()]}
+                          </span>
+                          <span className={`text-sm truncate ${isToday ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
+                            {meal.meal_name}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </button>
+            )
+          })()}
 
           {/* Active shopping items */}
           {items.length === 0 && (
@@ -204,24 +394,40 @@ export default function BoodschappenView({ onOpenMenu }) {
           {items.map(item => (
             <div
               key={item.uuid}
-              className={`bg-white rounded-2xl shadow-card px-4 py-3 flex items-center gap-3 transition-all ${
-                completing[item.uuid] ? 'opacity-50 scale-95' : ''
+              className={`rounded-2xl shadow-card px-3 py-2.5 flex items-center gap-3 transition-all duration-300 ${
+                completing[item.uuid]
+                  ? 'opacity-0 scale-95 -translate-x-4'
+                  : item._ghost
+                    ? 'bg-white/60 animate-pulse'
+                    : 'bg-white'
               }`}
             >
               <button
-                onClick={() => handleComplete(item)}
-                className="w-6 h-6 rounded-full border-2 border-accent-mint flex-shrink-0 flex items-center justify-center hover:bg-pastel-mint/30 transition-colors"
+                onClick={() => !item._ghost && handleComplete(item)}
+                className="flex-shrink-0 relative"
+                disabled={item._ghost}
               >
+                {item._ghost && !item.imageUrl ? (
+                  <div className="w-9 h-9 rounded-lg bg-gray-100 animate-pulse" />
+                ) : (
+                  <ItemImage
+                    src={item.imageUrl}
+                    alt={item.itemId}
+                    className="w-9 h-9 rounded-lg"
+                  />
+                )}
                 {completing[item.uuid] && (
-                  <svg className="w-4 h-4 text-accent-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <div className="absolute inset-0 bg-accent-mint/80 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
                 )}
               </button>
               <div className="flex-1 min-w-0">
-                <p className="text-gray-800 font-medium">{item.itemId}</p>
+                <p className={`font-medium text-sm ${item._ghost ? 'text-gray-400' : 'text-gray-800'}`}>{item.itemId}</p>
                 {item.specification && (
-                  <p className="text-gray-400 text-sm truncate">{item.specification}</p>
+                  <p className="text-gray-400 text-xs truncate">{item.specification}</p>
                 )}
               </div>
             </div>
@@ -249,17 +455,24 @@ export default function BoodschappenView({ onOpenMenu }) {
               {showRecent && recentItems.map(item => (
                 <div
                   key={item.uuid}
-                  className="bg-white/60 rounded-2xl shadow-card px-4 py-3 flex items-center gap-3"
+                  className="bg-white/60 rounded-2xl shadow-card px-3 py-2.5 flex items-center gap-3"
                 >
-                  <div className="w-6 h-6 rounded-full bg-pastel-mint/40 flex-shrink-0 flex items-center justify-center">
-                    <svg className="w-3.5 h-3.5 text-accent-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
+                  <div className="flex-shrink-0 relative opacity-40">
+                    <ItemImage
+                      src={item.imageUrl}
+                      alt={item.itemId}
+                      className="w-9 h-9 rounded-lg"
+                    />
+                    <div className="absolute inset-0 bg-pastel-mint/50 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 text-accent-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-gray-400 font-medium line-through">{item.itemId}</p>
+                    <p className="text-gray-400 font-medium text-sm line-through">{item.itemId}</p>
                     {item.specification && (
-                      <p className="text-gray-300 text-sm truncate line-through">{item.specification}</p>
+                      <p className="text-gray-300 text-xs truncate line-through">{item.specification}</p>
                     )}
                   </div>
                   <button
@@ -279,7 +492,43 @@ export default function BoodschappenView({ onOpenMenu }) {
       )}
 
       {/* Fixed input bar above the tab bar */}
-      <div className="fixed bottom-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-t border-gray-100">
+      <div
+        ref={inputBarRef}
+        className="fixed left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-t border-gray-100 transition-[bottom] duration-100"
+        style={{ bottom: keyboardOffset > 0 ? keyboardOffset : '4rem' }}
+      >
+        {/* Autocomplete suggestions */}
+        {suggestions.length > 0 && (
+          <div className="border-b border-gray-100">
+            {suggestions.map((s, i) => (
+              <button
+                key={s.de}
+                onClick={() => handleSelectSuggestion(s)}
+                className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
+                  i === acSelected ? 'bg-accent-mint/10' : 'hover:bg-gray-50'
+                }`}
+              >
+                <ItemImage
+                  src={s.imageUrl}
+                  alt={s.name}
+                  className="w-7 h-7 rounded-md"
+                />
+                <span className="text-sm text-gray-700">{s.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {duplicateMatch && !suggestions.length && (
+          <div className="px-4 pt-2.5 pb-0.5 flex items-center gap-2">
+            <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
+              <circle cx="12" cy="12" r="10" strokeWidth={1.5} />
+            </svg>
+            <p className="text-xs text-amber-500">
+              <span className="font-medium">"{duplicateMatch.itemId}"</span> staat al op de lijst
+            </p>
+          </div>
+        )}
         {showSpec && (
           <div className="px-4 pt-3">
             <input
@@ -314,15 +563,13 @@ export default function BoodschappenView({ onOpenMenu }) {
             type="text"
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') handleAdd()
-            }}
+            onKeyDown={handleInputKeyDown}
             placeholder="Toevoegen..."
             className="flex-1 text-sm px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-100 focus:outline-none focus:border-accent-mint/50 text-gray-800 placeholder-gray-300"
           />
           <button
-            onClick={handleAdd}
-            disabled={!inputValue.trim() || adding}
+            onClick={() => handleAdd()}
+            disabled={!inputValue.trim()}
             className="p-2.5 rounded-xl bg-accent-mint text-white disabled:opacity-30 transition-all active:scale-95 flex-shrink-0"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

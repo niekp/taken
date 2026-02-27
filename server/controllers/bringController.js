@@ -142,3 +142,20 @@ export async function getLists(req, res) {
     res.status(502).json({ error: 'Kon lijsten niet ophalen' })
   }
 }
+
+// GET /api/bring/catalog — get full item catalog for autocomplete
+export async function getCatalog(req, res) {
+  try {
+    const c = getClient()
+    if (!c) return res.status(400).json({ error: 'Bring! niet geconfigureerd' })
+
+    await ensureLoggedIn(c)
+    const catalog = await c.getCatalog()
+    // Cache for 24h since catalog rarely changes
+    res.set('Cache-Control', 'public, max-age=86400')
+    res.json(catalog)
+  } catch (err) {
+    console.error('Bring getCatalog error:', err.message)
+    res.status(502).json({ error: 'Kon catalogus niet ophalen' })
+  }
+}

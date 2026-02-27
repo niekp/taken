@@ -165,12 +165,9 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
     })
 
     return (
-      <div className="flex items-center gap-2 mt-2">
-        <svg className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        <span className="text-xs text-indigo-600">
-          {Object.entries(byUser).map(([name, labels]) => `${name}: ${labels.join(', ')}`).join(' | ')}
+      <div className="flex items-center gap-1.5 mt-1.5">
+        <span className="text-xs text-gray-400">
+          {Object.entries(byUser).map(([name, labels]) => `${name}: ${labels.join(', ')}`).join(' · ')}
         </span>
       </div>
     )
@@ -217,7 +214,7 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
           const today = isToday(date)
           const isEditing = editingDate === dateStr
 
-          return (
+           return (
             <div
               key={dateStr}
               className={`bg-white rounded-2xl px-4 py-3 transition-all ${
@@ -226,8 +223,8 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
             >
               {/* Day header row */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center ${
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${
                     today
                       ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white'
                       : 'bg-gray-50 text-gray-600'
@@ -239,50 +236,57 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
                       {date.getDate()}
                     </span>
                   </div>
-                  <div className="min-w-0">
-                    <p className={`text-sm font-medium ${today ? 'text-accent-mint' : 'text-gray-700'}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-medium ${today ? 'text-gray-800' : 'text-gray-700'}`}>
                       {DAY_NAMES[date.getDay()]}
-                      {today && <span className="text-xs text-accent-mint/70 ml-1.5 font-normal">vandaag</span>}
+                      {today && <span className="text-xs text-accent-mint ml-1.5 font-medium">vandaag</span>}
                     </p>
                     {meal && !isEditing && (
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
-                        </svg>
-                        <button
-                          onClick={() => startEditing(meal)}
-                          className="text-xs text-amber-800 font-medium hover:text-amber-600 transition-colors truncate"
-                        >
-                          {meal.meal_name}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(meal.id)}
-                          className="p-0.5 text-gray-300 hover:text-red-400 rounded transition-colors flex-shrink-0"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
+                      <p
+                        onClick={() => startEditing(meal)}
+                        className="text-[15px] text-gray-800 font-medium mt-0.5 truncate cursor-pointer hover:text-accent-mint transition-colors"
+                      >
+                        {meal.meal_name}
+                      </p>
                     )}
-                    {!meal && !isEditing && renderDailyScheduleSummary(dateStr)}
+                    {!meal && !isEditing && (
+                      <p className="text-sm text-gray-300 mt-0.5">Geen maaltijd</p>
+                    )}
                   </div>
                 </div>
 
-                {!meal && !isEditing && (
-                  <button
-                    onClick={() => startAdding(dateStr)}
-                    className="p-2 rounded-xl hover:bg-gray-50 text-gray-300 hover:text-accent-mint transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
+                {!isEditing && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {meal && (
+                      <button
+                        onClick={() => handleDelete(meal.id)}
+                        className="p-2 rounded-xl text-gray-200 hover:text-red-400 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => meal ? startEditing(meal) : startAdding(dateStr)}
+                      className="p-2 rounded-xl text-gray-300 hover:text-accent-mint transition-colors"
+                    >
+                      {meal ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {/* Show dagschema below meal when both exist */}
-              {meal && !isEditing && renderDailyScheduleSummary(dateStr)}
+              {/* Daily schedule info */}
+              {!isEditing && renderDailyScheduleSummary(dateStr)}
 
               {/* Editing form */}
               {isEditing && (

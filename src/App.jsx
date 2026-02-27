@@ -15,13 +15,19 @@ import NotificationSettings from './components/NotificationSettings'
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
-  const [view, setView] = useState('weekly') // 'weekly' | 'meals' | 'schedules' | 'boodschappen' | 'dagschema'
+  const [view, setView] = useState(() => {
+    try {
+      const saved = localStorage.getItem('activeTab')
+      if (saved && ['weekly', 'meals', 'schedules', 'boodschappen', 'dagschema'].includes(saved)) return saved
+    } catch {}
+    return 'weekly'
+  })
   const [showMenu, setShowMenu] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showUserManagement, setShowUserManagement] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
-  const [bringEnabled, setBringEnabled] = useState(false)
+  const [bringEnabled, setBringEnabled] = useState(null) // null = not yet checked
   const [presentationMode, setPresentationMode] = useState(() => {
     const params = new URLSearchParams(window.location.search)
     return params.get('mode') === 'presentation'
@@ -80,6 +86,18 @@ export default function App() {
     setIsRestoringSession(false)
   }, [users])
 
+  // If saved tab was 'boodschappen' but Bring is disabled, fall back to weekly
+  useEffect(() => {
+    if (view === 'boodschappen' && bringEnabled === false) {
+      setView('weekly')
+    }
+  }, [bringEnabled])
+
+  // Persist active tab
+  useEffect(() => {
+    try { localStorage.setItem('activeTab', view) } catch {}
+  }, [view])
+
   useEffect(() => {
     if (presentationMode && users.length > 0) {
       const params = new URLSearchParams(window.location.search)
@@ -112,7 +130,7 @@ export default function App() {
       const data = await api.getBringStatus()
       setBringEnabled(data.configured && !!data.list_uuid)
     } catch (err) {
-      // Bring not available
+      setBringEnabled(false)
     }
   }
 

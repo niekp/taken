@@ -12,7 +12,8 @@ export function findAll() {
     SELECT s.*,
       u.name AS assigned_to_name,
       (SELECT COUNT(*) FROM tasks t WHERE t.schedule_id = s.id AND t.completed_at IS NOT NULL) AS completed_count,
-      (SELECT t.date FROM tasks t WHERE t.schedule_id = s.id AND t.completed_at IS NULL ORDER BY t.date ASC LIMIT 1) AS next_date
+      (SELECT t.date FROM tasks t WHERE t.schedule_id = s.id AND t.completed_at IS NULL ORDER BY t.date ASC LIMIT 1) AS next_date,
+      (SELECT t.original_date FROM tasks t WHERE t.schedule_id = s.id AND t.completed_at IS NULL ORDER BY t.date ASC LIMIT 1) AS original_next_date
     FROM schedules s
     LEFT JOIN users u ON s.assigned_to = u.id
     ORDER BY s.category, s.title
@@ -26,7 +27,8 @@ export function findById(id) {
     SELECT s.*,
       u.name AS assigned_to_name,
       (SELECT COUNT(*) FROM tasks t WHERE t.schedule_id = s.id AND t.completed_at IS NOT NULL) AS completed_count,
-      (SELECT t.date FROM tasks t WHERE t.schedule_id = s.id AND t.completed_at IS NULL ORDER BY t.date ASC LIMIT 1) AS next_date
+      (SELECT t.date FROM tasks t WHERE t.schedule_id = s.id AND t.completed_at IS NULL ORDER BY t.date ASC LIMIT 1) AS next_date,
+      (SELECT t.original_date FROM tasks t WHERE t.schedule_id = s.id AND t.completed_at IS NULL ORDER BY t.date ASC LIMIT 1) AS original_next_date
     FROM schedules s
     LEFT JOIN users u ON s.assigned_to = u.id
     WHERE s.id = ?

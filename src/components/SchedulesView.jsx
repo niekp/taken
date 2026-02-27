@@ -10,7 +10,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
   const [showModal, setShowModal] = useState(false)
   const [editSchedule, setEditSchedule] = useState(null)
   const [showConfetti, setShowConfetti] = useState(false)
-  const [filter, setFilter] = useState('all') // 'all' | 'overdue' | 'due' | 'upcoming'
+  const [filter, setFilter] = useState('all') // 'all' | 'postponed' | 'due' | 'upcoming'
 
   useEffect(() => {
     loadSchedules()
@@ -24,6 +24,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
 
   async function loadSchedules() {
     try {
+      await api.runHousekeeping()
       const data = await api.getSchedules()
       setSchedules(data)
     } catch (err) {
@@ -33,22 +34,29 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
   }
 
   function getStatus(schedule) {
-    if (!schedule.next_date) return { status: 'upcoming', days_remaining: 999 }
+    if (!schedule.next_date) return { status: 'upcoming', days_remaining: 999, days_late: 0 }
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const nextDate = new Date(schedule.next_date + 'T00:00:00')
     const diffMs = nextDate - today
     const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
 
-    if (diffDays < 0) return { status: 'overdue', days_remaining: diffDays }
-    if (diffDays === 0) return { status: 'due', days_remaining: 0 }
-    return { status: 'upcoming', days_remaining: diffDays }
+    // Task was postponed by housekeeping (original_date differs from current date)
+    const isPostponed = schedule.original_next_date && schedule.original_next_date !== schedule.next_date
+
+    if (isPostponed) {
+      const origDate = new Date(schedule.original_next_date + 'T00:00:00')
+      const daysLate = Math.round((today - origDate) / (1000 * 60 * 60 * 24))
+      return { status: 'postponed', days_remaining: diffDays, days_late: Math.max(0, daysLate) }
+    }
+    if (diffDays === 0) return { status: 'due', days_remaining: 0, days_late: 0 }
+    return { status: 'upcoming', days_remaining: diffDays, days_late: 0 }
   }
 
   function getEnrichedSchedules() {
     return schedules.map(s => {
-      const { status, days_remaining } = getStatus(s)
-      return { ...s, status, days_remaining }
+      const { status, days_remaining, days_late } = getStatus(s)
+      return { ...s, status, days_remaining, days_late }
     })
   }
 
@@ -71,7 +79,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
       }
     })
 
-    const statusOrder = { overdue: 0, due: 1, upcoming: 2 }
+    const statusOrder = { postponed: 0, due: 1, upcoming: 2 }
     const sortItems = (a, b) => {
       const orderDiff = statusOrder[a.status] - statusOrder[b.status]
       if (orderDiff !== 0) return orderDiff
@@ -113,17 +121,17 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
 
   const counts = {
     all: enriched.length,
-    overdue: enriched.filter(s => s.status === 'overdue').length,
+    postponed: enriched.filter(s => s.status === 'postponed').length,
     due: enriched.filter(s => s.status === 'due').length,
     upcoming: enriched.filter(s => s.status === 'upcoming').length,
   }
 
   function getStatusBadge(schedule) {
-    if (schedule.status === 'overdue') {
-      const days = Math.abs(schedule.days_remaining)
+    if (schedule.status === 'postponed') {
+      const days = schedule.days_late
       return (
         <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-          {days} {days === 1 ? 'dag' : 'dagen'} te laat
+          {days > 0 ? `${days} ${days === 1 ? 'dag' : 'dagen'} uitgesteld` : 'Uitgesteld'}
         </span>
       )
     }
@@ -162,7 +170,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
 
   const FILTERS = [
     { key: 'all', label: 'Alle' },
-    { key: 'overdue', label: 'Te laat', dot: 'bg-red-400' },
+    { key: 'postponed', label: 'Uitgesteld', dot: 'bg-red-400' },
     { key: 'due', label: 'Vandaag', dot: 'bg-amber-400' },
     { key: 'upcoming', label: 'Binnenkort', dot: 'bg-gray-300' },
   ]
@@ -192,9 +200,9 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
           
           <div className="text-center">
             <h1 className="text-lg font-semibold text-gray-800">Schema's</h1>
-            {counts.overdue > 0 && (
+            {counts.postponed > 0 && (
               <p className="text-xs text-red-500 font-medium mt-0.5">
-                {counts.overdue} {counts.overdue === 1 ? 'taak' : 'taken'} te laat
+                {counts.postponed} uitgesteld
               </p>
             )}
           </div>
@@ -267,7 +275,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
                       <div
                         key={schedule.id}
                         className={`bg-white rounded-2xl shadow-sm border transition-all ${
-                          schedule.status === 'overdue'
+                          schedule.status === 'postponed'
                             ? 'border-red-200'
                             : schedule.status === 'due'
                             ? 'border-amber-200'
@@ -280,7 +288,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
                               <button
                                 onClick={() => handleComplete(schedule)}
                                 className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
-                                  schedule.status === 'overdue'
+                                  schedule.status === 'postponed'
                                     ? 'border-red-300 hover:bg-red-50'
                                     : schedule.status === 'due'
                                     ? 'border-amber-300 hover:bg-amber-50'
@@ -289,7 +297,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
                                 title="Markeer als gedaan"
                               >
                                 <svg className={`w-3 h-3 ${
-                                  schedule.status === 'overdue' ? 'text-red-300' : schedule.status === 'due' ? 'text-amber-300' : 'text-gray-300'
+                                  schedule.status === 'postponed' ? 'text-red-300' : schedule.status === 'due' ? 'text-amber-300' : 'text-gray-300'
                                 }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
@@ -326,12 +334,12 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
                           </div>
                         </div>
 
-                        {schedule.status === 'overdue' && (
+                        {schedule.status === 'postponed' && schedule.days_late > 0 && (
                           <div className="px-4 pb-3">
                             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-red-400 rounded-full"
-                                style={{ width: `${Math.min(100, (Math.abs(schedule.days_remaining) / schedule.interval_days) * 100)}%` }}
+                                style={{ width: `${Math.min(100, (schedule.days_late / schedule.interval_days) * 100)}%` }}
                               />
                             </div>
                           </div>

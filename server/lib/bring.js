@@ -1,10 +1,32 @@
 const BASE_URL = 'https://api.getbring.com/rest'
 const API_KEY = 'cof4Nc6D8saplXjE3h3HXqHH8m7VU2i1Gs0g85Sp'
 const CATALOG_URL = 'https://web.getbring.com/locale/articles'
+const IMAGE_BASE = 'https://web.getbring.com/assets/images/items'
 
 // In-memory translation cache: locale -> { deToLocale: Map, localeToDe: Map, fetchedAt: number }
 const translationCache = {}
 const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
+
+/**
+ * Normalize a German item name to an image path segment.
+ * Mirrors Bring!'s BringItem.normalizeStringPath from their web app.
+ */
+function normalizeImagePath(name) {
+  const replacements = {
+    ' ': '_', '-': '_', '!': '',
+    '\u00E4': 'ae', '\u00F6': 'oe', '\u00FC': 'ue', '\u00E9': 'e',
+  }
+  const re = new RegExp(Object.keys(replacements).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi')
+  return name.toLowerCase().replace(re, m => replacements[m.toLowerCase()] || '')
+}
+
+/**
+ * Build a Bring! image URL from a German item ID.
+ */
+export function bringImageUrl(germanItemId) {
+  if (!germanItemId) return null
+  return `${IMAGE_BASE}/${normalizeImagePath(germanItemId)}.png`
+}
 
 async function loadTranslations(locale) {
   const cached = translationCache[locale]
@@ -19,19 +41,36 @@ async function loadTranslations(locale) {
 
     const deToLocale = new Map()
     const localeToDe = new Map()
+    // catalog: array of { name (localized), de (german key), imageUrl }
+    const catalog = []
+
+    // Known category keys (German) that appear in the Bring! catalog as section headers
+    const knownCategories = new Set([
+      'Getränke & Tabak', 'Brot & Gebäck', 'Fertig- & Tiefkühlprodukte',
+      'Früchte & Gemüse', 'Getreideprodukte', 'Haushalt & Gesundheit',
+      'Zutaten & Gewürze', 'Fleisch & Fisch', 'Milch & Käse',
+      'Tierbedarf', 'Snacks & Süsswaren', 'Eigene Artikel', 'Zuletzt verwendet',
+    ])
 
     for (const [de, localized] of Object.entries(data)) {
       deToLocale.set(de, localized)
-      // For reverse lookup, use lowercase key to handle case-insensitive matching
       localeToDe.set(localized.toLowerCase(), de)
+
+      if (!knownCategories.has(de)) {
+        catalog.push({
+          name: localized,
+          de,
+          imageUrl: bringImageUrl(de),
+        })
+      }
     }
 
-    translationCache[locale] = { deToLocale, localeToDe, fetchedAt: Date.now() }
+    translationCache[locale] = { deToLocale, localeToDe, catalog, fetchedAt: Date.now() }
     return translationCache[locale]
   } catch (err) {
     console.error(`Failed to load Bring! translations for ${locale}:`, err.message)
     // Return empty maps so items show as-is
-    return { deToLocale: new Map(), localeToDe: new Map() }
+    return { deToLocale: new Map(), localeToDe: new Map(), catalog: [] }
   }
 }
 
@@ -209,19 +248,51 @@ export class BringClient {
   }
 
   async getItems(listUuid) {
-    const data = await this._request('GET', `/v2/bringlists/${listUuid}`)
+    // Fetch items and details in parallel
+    const [data, details] = await Promise.all([
+      this._request('GET', `/v2/bringlists/${listUuid}`),
+      this._request('GET', `/v2/bringlists/${listUuid}/details`).catch(() => []),
+    ])
     const translations = await this._getTranslations()
 
-    const purchase = (data.items?.purchase || []).map(item => ({
-      ...item,
-      itemId: this._translateToLocale(item.itemId, translations),
-    }))
-    const recently = (data.items?.recently || []).map(item => ({
-      ...item,
-      itemId: this._translateToLocale(item.itemId, translations),
-    }))
+    // Build itemId -> detail lookup for icon mapping
+    // Details use itemId (the German/custom name) as the stable key, not uuid
+    // (uuids change each time an item is re-added)
+    const detailMap = new Map()
+    if (Array.isArray(details)) {
+      for (const d of details) {
+        detailMap.set(d.itemId, d)
+      }
+    }
+
+    const enrichItem = (item) => {
+      const detail = detailMap.get(item.itemId)
+      // userIconItemId is a German catalog key for the icon (e.g., "Spinat" for custom "Diepvries spinazie").
+      // For standard catalog items, item.itemId is already a German key (e.g., "Pommes Chips").
+      // For unknown custom items, imageUrl stays null and the frontend shows a fallback.
+      const iconId = detail?.userIconItemId || null
+      const germanId = iconId || item.itemId
+      const isKnownItem = translations.deToLocale.has(germanId)
+      return {
+        ...item,
+        itemId: this._translateToLocale(item.itemId, translations),
+        imageUrl: isKnownItem || iconId ? bringImageUrl(germanId) : null,
+      }
+    }
+
+    const purchase = (data.items?.purchase || []).map(enrichItem)
+    const recently = (data.items?.recently || []).map(enrichItem)
 
     return { purchase, recently }
+  }
+
+  /**
+   * Get the full catalog of known Bring! items (for autocomplete).
+   * Returns an array of { name, de, imageUrl }.
+   */
+  async getCatalog() {
+    const translations = await this._getTranslations()
+    return translations.catalog || []
   }
 
   async addItem(listUuid, itemName, specification = '') {
