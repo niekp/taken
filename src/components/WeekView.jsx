@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
-import { getUserColor, BOTH_COLOR } from '../lib/colors'
+import { getUserColor } from '../lib/colors'
 
 const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -250,10 +250,6 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                   </div>
                 )
               })}
-              <div className="flex items-center gap-1">
-                <div className={`w-3 h-3 rounded-full ${BOTH_COLOR.dot}`}></div>
-                <span>Samen</span>
-              </div>
             </div>
             <button onClick={onTogglePresentation} className="p-2 hover:bg-white/60 rounded-lg transition-colors" title="Presentatie modus afsluiten">
               <svg className="w-5 h-5 md:w-6 md:h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

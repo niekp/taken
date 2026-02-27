@@ -165,11 +165,13 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
           )}
         </div>
 
-        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${config.dot}`} title={assignee}>
-          {assigneeAvatar && (
-            <img src={assigneeAvatar} alt={assignee} className="w-full h-full rounded-full object-cover" />
-          )}
-        </div>
+        {!task.is_both && (
+          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${config.dot}`} title={assignee}>
+            {assigneeAvatar && (
+              <img src={assigneeAvatar} alt={assignee} className="w-full h-full rounded-full object-cover" />
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -254,7 +256,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
         style={{
           borderLeftWidth: '3px',
           borderLeftStyle: task.schedule_id ? 'dashed' : 'solid',
-          borderLeftColor: config.border.replace('border-', ''),
+          borderLeftColor: task.is_both ? '#e5e7eb' : config.border.replace('border-', ''),
           transform: `translateX(${swipeX}px)`,
           transition: isDragging ? 'none' : 'transform 0.3s ease-out'
         }}
@@ -288,12 +290,14 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
               {task.title}
             </p>
             <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-              <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-md font-medium ${config.bgLight} ${config.text}`}>
-                {assigneeAvatar ? (
-                  <img src={assigneeAvatar} alt={assignee} className="w-3.5 h-3.5 rounded-full object-cover mr-1" />
-                ) : null}
-                {assignee}
-              </span>
+              {!task.is_both && (
+                <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-md font-medium ${config.bgLight} ${config.text}`}>
+                  {assigneeAvatar ? (
+                    <img src={assigneeAvatar} alt={assignee} className="w-3.5 h-3.5 rounded-full object-cover mr-1" />
+                  ) : null}
+                  {assignee}
+                </span>
+              )}
               {task.schedule_id && (
                 <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-100 text-gray-400">
                   <svg className="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
