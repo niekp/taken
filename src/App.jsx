@@ -216,6 +216,7 @@ export default function App() {
         />
       ) : view === 'meals' ? (
         <MealsView
+          users={users}
           onOpenMenu={() => setShowMenu(true)}
           presentationMode={presentationMode}
           onTogglePresentation={() => setPresentationMode(!presentationMode)}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
+import { getUserColor } from '../lib/colors'
 
 const DAY_NAMES = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
 const DAY_SHORT = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
@@ -23,7 +24,7 @@ function getDays() {
   return days
 }
 
-export default function MealsView({ onOpenMenu, presentationMode, onTogglePresentation }) {
+export default function MealsView({ users, onOpenMenu, presentationMode, onTogglePresentation }) {
   const [meals, setMeals] = useState([])
   const [dailyEntries, setDailyEntries] = useState({})
   const [suggestions, setSuggestions] = useState([])
@@ -154,7 +155,7 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
     return dailyEntries[dateStr] || []
   }
 
-  function renderDailyScheduleSummary(dateStr) {
+  function renderDailySchedulePills(dateStr) {
     const entries = getDailyEntriesForDate(dateStr)
     if (entries.length === 0) return null
 
@@ -164,11 +165,27 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
       byUser[e.user_name].push(e.label)
     })
 
+    function renderAvatar(name) {
+      const userObj = (users || []).find(u => u.name === name)
+      const color = userObj ? getUserColor(userObj) : { bg: 'bg-gray-300' }
+      if (userObj?.avatar_url) {
+        return <img src={userObj.avatar_url} alt={name} className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+      }
+      return (
+        <div className={`w-4 h-4 rounded-full ${color.bg} flex items-center justify-center flex-shrink-0`}>
+          <span className="text-white font-bold text-[9px] leading-none">{name.charAt(0)}</span>
+        </div>
+      )
+    }
+
     return (
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span className="text-xs text-gray-400">
-          {Object.entries(byUser).map(([name, labels]) => `${name}: ${labels.join(', ')}`).join(' · ')}
-        </span>
+      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+        {Object.entries(byUser).map(([name, labels]) => (
+          <div key={name} className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-xl">
+            {renderAvatar(name)}
+            <span className="text-xs text-gray-500 truncate max-w-[120px]">{labels.join(', ')}</span>
+          </div>
+        ))}
       </div>
     )
   }
@@ -286,7 +303,7 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
               </div>
 
               {/* Daily schedule info */}
-              {!isEditing && renderDailyScheduleSummary(dateStr)}
+              {!isEditing && renderDailySchedulePills(dateStr)}
 
               {/* Editing form */}
               {isEditing && (
