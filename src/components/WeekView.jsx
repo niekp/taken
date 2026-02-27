@@ -160,39 +160,49 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     return dailyEntries[dateStr] || []
   }
 
-  function renderDailyScheduleSummary(dayIndex, compact = false) {
+  function renderDayInfoCard(dayIndex, compact = false) {
     const entries = getDailyEntriesForDay(dayIndex)
-    if (entries.length === 0) return null
+    const meal = getMealForDay(dayIndex)
+    if (entries.length === 0 && !meal) return null
 
-    // Group by user: "Niek: Werk, Kind: Opvang"
+    // Group entries by user
     const byUser = {}
     entries.forEach(e => {
-      if (!byUser[e.user_name]) byUser[e.user_name] = []
-      byUser[e.user_name].push(e.label)
+      if (!byUser[e.user_name]) byUser[e.user_name] = { labels: [] }
+      byUser[e.user_name].labels.push(e.label)
     })
 
-    if (compact) {
-      // Compact: just show labels with colored dots
+    const userEntries = Object.entries(byUser)
+
+    function renderAvatar(name, size = 'w-4 h-4 text-[9px]') {
+      const userObj = users.find(u => u.name === name)
+      const color = userObj ? getUserColor(userObj) : { bg: 'bg-gray-300' }
+      if (userObj?.avatar_url) {
+        return <img src={userObj.avatar_url} alt={name} className={`${size} rounded-full object-cover flex-shrink-0`} />
+      }
       return (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200/60 rounded-xl">
-          <svg className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span className="text-xs text-indigo-700 truncate">
-            {Object.entries(byUser).map(([name, labels]) => `${name}: ${labels.join(', ')}`).join(' | ')}
-          </span>
+        <div className={`${size} rounded-full ${color.bg} flex items-center justify-center flex-shrink-0`}>
+          <span className="text-white font-bold leading-none">{name.charAt(0)}</span>
         </div>
       )
     }
 
     return (
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200/60 rounded-2xl">
-        <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        <span className="text-xs font-medium text-indigo-700">
-          {Object.entries(byUser).map(([name, labels]) => `${name}: ${labels.join(', ')}`).join(' | ')}
-        </span>
+      <div className={`flex flex-wrap items-center gap-1.5 ${compact ? '' : 'gap-2'}`}>
+        {userEntries.map(([name, { labels }]) => (
+          <div key={name} className={`flex items-center gap-1.5 ${compact ? 'bg-white/60 px-2 py-1 rounded-lg' : 'bg-white/70 shadow-card px-2.5 py-1.5 rounded-xl'}`}>
+            {renderAvatar(name, compact ? 'w-3.5 h-3.5 text-[8px]' : 'w-4 h-4 text-[9px]')}
+            <span className={`text-gray-500 truncate ${compact ? 'text-[10px] max-w-[70px]' : 'text-xs max-w-[120px]'}`}>{labels.join(', ')}</span>
+          </div>
+        ))}
+        {meal && (
+          <div className={`flex items-center gap-1.5 ${compact ? 'bg-white/60 px-2 py-1 rounded-lg' : 'bg-white/70 shadow-card px-2.5 py-1.5 rounded-xl'}`}>
+            <svg className={`text-gray-400 flex-shrink-0 ${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
+            </svg>
+            <span className={`text-gray-500 truncate ${compact ? 'text-[10px] max-w-[70px]' : 'text-xs max-w-[120px]'}`}>{meal.meal_name}</span>
+          </div>
+        )}
       </div>
     )
   }
@@ -272,18 +282,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                  {renderDailyScheduleSummary(i, true)}
-                  {(() => {
-                    const meal = getMealForDay(i)
-                    return meal ? (
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200/60 rounded-xl">
-                        <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
-                        </svg>
-                        <span className="text-xs font-medium text-amber-800 truncate">{meal.meal_name}</span>
-                      </div>
-                    ) : null
-                  })()}
+                  {renderDayInfoCard(i, true)}
                   {dayTasks.map(task => (
                     <TaskItem
                       key={task.id}
@@ -346,16 +345,9 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             <div className="p-3 space-y-2">
               {(() => {
                 const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(activeDay)
-                const meal = getMealForDay(activeDay)
                 return (
                   <>
-                    {renderDailyScheduleSummary(activeDay)}
-                    {meal && (
-                      <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200/60 rounded-2xl">
-                        <span className="text-lg">🍽️</span>
-                        <span className="text-sm font-medium text-amber-800">{meal.meal_name}</span>
-                      </div>
-                    )}
+                    {renderDayInfoCard(activeDay)}
                     {dayTasks.map(task => (
                       <TaskItem
                         key={task.id}
@@ -370,7 +362,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                     {dayGhosts.map(ghost => (
                       <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
                     ))}
-                    {!meal && dayTasks.length === 0 && dayGhosts.length === 0 && (
+                    {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(activeDay) && getDailyEntriesForDay(activeDay).length === 0 && (
                       <div className="text-center text-gray-400 py-8">
                         Geen taken
                       </div>
@@ -518,18 +510,9 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           {(() => {
             const { tasks: dayTasks, ghosts: dayGhosts } = getItemsForDay(activeDay)
             const isToday = activeDay === currentDayIndex && currentWeekOffset === 0
-            const meal = getMealForDay(activeDay)
             return (
               <>
-                {renderDailyScheduleSummary(activeDay)}
-                {meal && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200/60 rounded-2xl">
-                    <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
-                    </svg>
-                    <span className="text-xs font-medium text-amber-800">{meal.meal_name}</span>
-                  </div>
-                )}
+                {renderDayInfoCard(activeDay)}
                 {dayTasks.map(task => (
                   <TaskItem
                     key={task.id}
@@ -549,7 +532,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 {dayGhosts.map(ghost => (
                   <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={false} />
                 ))}
-                {!meal && dayTasks.length === 0 && dayGhosts.length === 0 && (
+                {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(activeDay) && getDailyEntriesForDay(activeDay).length === 0 && (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-pastel-lavender/50 rounded-2xl mx-auto mb-4 flex items-center justify-center">
                       <svg className="w-8 h-8 text-pastel-lavenderDark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
