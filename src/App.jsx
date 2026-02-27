@@ -113,9 +113,17 @@ export default function App() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     setCurrentUser(null)
     localStorage.removeItem('currentUserId')
+
+    // Unregister service worker so the next load gets a fresh one
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      for (const reg of registrations) {
+        await reg.unregister()
+      }
+    }
   }
 
   function handleComplete() {

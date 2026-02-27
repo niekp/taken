@@ -10,7 +10,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'app_icon.jpeg'],
+      includeAssets: ['icons/icon512_rounded.png', 'icons/icon512_maskable.png'],
       manifest: {
         name: 'Huishouden',
         short_name: 'Huishouden',
@@ -21,15 +21,15 @@ export default defineConfig({
         theme_color: '#A7F3D0',
         icons: [
           {
-            src: '/app_icon.jpeg',
+            src: '/icons/icon512_rounded.png',
             sizes: '512x512',
-            type: 'image/jpeg',
+            type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/app_icon.jpeg',
+            src: '/icons/icon512_maskable.png',
             sizes: '512x512',
-            type: 'image/jpeg',
+            type: 'image/png',
             purpose: 'maskable'
           }
         ]

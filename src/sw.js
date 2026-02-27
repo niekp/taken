@@ -53,8 +53,7 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Huishouden'
   const options = {
     body: data.body || '',
-    icon: '/app_icon.jpeg',
-    badge: '/app_icon.jpeg',
+    icon: '/icons/icon512_rounded.png',
     tag: 'daily-summary',
     renotify: true,
   }
