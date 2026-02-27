@@ -21,20 +21,25 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
       : { bg: 'bg-gray-100', bgLight: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-500', dot: 'bg-gray-400' }
 
   const [swipeX, setSwipeX] = useState(0)
+  const [revealed, setRevealed] = useState(null) // null, 'left' (delete), or 'right' (postpone)
+  const [isDragging, setIsDragging] = useState(false)
   const touchStartX = useRef(null)
-  const swipeDirection = useRef(null) // 'left' or 'right', locked after first significant move
+  const swipeDirection = useRef(null)
+  const actionTapped = useRef(false) // suppress parent click after action button tap
 
   const canSwipeLeft = !isGhost && !isCompleted && !task.schedule_id && onDelete
   const canSwipeRight = !isGhost && !isCompleted && onPostpone
 
   useEffect(() => {
     setSwipeX(0)
+    setRevealed(null)
   }, [resetKey])
 
   function handleTouchStart(e) {
     if (isGhost || isCompleted) return
     touchStartX.current = e.touches[0].clientX
     swipeDirection.current = null
+    setIsDragging(true)
   }
 
   function handleTouchMove(e) {
@@ -47,36 +52,43 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
     }
 
     if (swipeDirection.current === 'left' && canSwipeLeft) {
-      setSwipeX(Math.max(diff, -100))
+      setSwipeX(Math.max(diff, -80))
     } else if (swipeDirection.current === 'right' && canSwipeRight) {
-      setSwipeX(Math.min(diff, 100))
+      setSwipeX(Math.min(diff, 80))
     }
   }
 
   function handleTouchEnd() {
-    if (swipeDirection.current === 'left') {
-      if (swipeX < -60 && onDelete) {
-        onDeleteAttempt?.()
-        onDelete()
-      } else if (swipeX < -30) {
+    if (swipeDirection.current === 'left' && canSwipeLeft) {
+      if (swipeX < -30) {
+        // Snap open to reveal delete button
         setSwipeX(-80)
+        setRevealed('left')
       } else {
         setSwipeX(0)
+        setRevealed(null)
       }
-    } else if (swipeDirection.current === 'right') {
-      if (swipeX > 60 && onPostpone) {
-        onPostpone()
-        setSwipeX(0)
-      } else if (swipeX > 30) {
+    } else if (swipeDirection.current === 'right' && canSwipeRight) {
+      if (swipeX > 30) {
+        // Snap open to reveal postpone button
         setSwipeX(80)
+        setRevealed('right')
       } else {
         setSwipeX(0)
+        setRevealed(null)
       }
     } else {
       setSwipeX(0)
+      setRevealed(null)
     }
     touchStartX.current = null
     swipeDirection.current = null
+    setIsDragging(false)
+  }
+
+  function closeSwipe() {
+    setSwipeX(0)
+    setRevealed(null)
   }
 
   // Ghost tasks - preview style
@@ -150,15 +162,42 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
 
   return (
     <div
-      onClick={() => !isCompleted && onEdit && onEdit(task)}
+      onClick={() => {
+        if (actionTapped.current) {
+          actionTapped.current = false
+          return
+        }
+        if (revealed) {
+          closeSwipe()
+          return
+        }
+        if (!isCompleted && onEdit) onEdit(task)
+      }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       className="relative overflow-hidden"
     >
-      {/* Postpone action (right swipe reveals left side) */}
-      <div
-        className={`absolute left-0 top-0 bottom-0 w-20 bg-amber-500 flex items-center justify-center transition-opacity duration-200 ${swipeX > 10 ? 'opacity-100' : 'opacity-0'}`}
+      {/* Postpone button (right swipe reveals left side) */}
+      <button
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          actionTapped.current = true
+          if (onPostpone) {
+            onPostpone()
+            closeSwipe()
+          }
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (onPostpone) {
+            onPostpone()
+            closeSwipe()
+          }
+        }}
+        className={`absolute left-0 top-0 bottom-0 w-20 z-10 bg-amber-500 active:bg-amber-600 flex items-center justify-center transition-opacity duration-200 ${swipeX > 10 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         style={{ borderRadius: '0.75rem' }}
       >
         <div className="flex flex-col items-center gap-0.5">
@@ -167,16 +206,35 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
           </svg>
           <span className="text-white text-xs font-medium">Morgen</span>
         </div>
-      </div>
-      {/* Delete action (left swipe reveals right side) */}
-      <div
-        className={`absolute right-0 top-0 bottom-0 w-20 bg-red-500 flex items-center justify-center transition-opacity duration-200 ${swipeX < -10 ? 'opacity-100' : 'opacity-0'}`}
+      </button>
+      {/* Delete button (left swipe reveals right side) */}
+      <button
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          actionTapped.current = true
+          if (onDelete) {
+            onDeleteAttempt?.()
+            onDelete()
+            closeSwipe()
+          }
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (onDelete) {
+            onDeleteAttempt?.()
+            onDelete()
+            closeSwipe()
+          }
+        }}
+        className={`absolute right-0 top-0 bottom-0 w-20 z-10 bg-red-500 active:bg-red-600 flex items-center justify-center transition-opacity duration-200 ${swipeX < -10 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         style={{ borderRadius: '0.75rem' }}
       >
         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
-      </div>
+      </button>
       <div
         className={`task-card group ${isCompleted ? 'opacity-60' : ''}`}
         style={{
@@ -184,7 +242,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
           borderLeftStyle: task.schedule_id ? 'dashed' : 'solid',
           borderLeftColor: config.border.replace('border-', ''),
           transform: `translateX(${swipeX}px)`,
-          transition: swipeX === 0 ? 'transform 0.3s ease-out' : 'none'
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out'
         }}
       >
         <div className="flex items-start gap-2.5 px-3 py-2 rounded-xl">

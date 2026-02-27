@@ -121,10 +121,6 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   }
 
   async function handleDeleteTask(task) {
-    if (!confirm('Weet je zeker dat je deze taak wilt verwijderen?')) {
-      loadData()
-      return
-    }
     try {
       await api.deleteTask(task.id)
       loadData()
