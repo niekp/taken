@@ -35,7 +35,7 @@ function ItemImage({ src, alt, className = '' }) {
   )
 }
 
-export default function BoodschappenView({ onOpenMenu }) {
+export default function GroceryView({ onOpenMenu }) {
   const [items, setItems] = useState([])
   const [recentItems, setRecentItems] = useState([])
   const [meals, setMeals] = useState([])
@@ -46,11 +46,14 @@ export default function BoodschappenView({ onOpenMenu }) {
   const [inputSpec, setInputSpec] = useState('')
   const [showSpec, setShowSpec] = useState(false)
   const [completing, setCompleting] = useState({})
+  const [editingItem, setEditingItem] = useState(null) // uuid of item being edited
+  const [editName, setEditName] = useState('')
+  const [editSpec, setEditSpec] = useState('')
   const [showRecent, setShowRecent] = useState(() => {
-    try { return localStorage.getItem('boodschappen:showRecent') === 'true' } catch { return false }
+    try { return localStorage.getItem('grocery:showRecent') === 'true' } catch { return false }
   })
   const [showMeals, setShowMeals] = useState(() => {
-    try { return localStorage.getItem('boodschappen:showMeals') === 'true' } catch { return false }
+    try { return localStorage.getItem('grocery:showMeals') === 'true' } catch { return false }
   })
   const [keyboardOffset, setKeyboardOffset] = useState(0)
   const [acSelected, setAcSelected] = useState(-1)
@@ -60,10 +63,10 @@ export default function BoodschappenView({ onOpenMenu }) {
 
   // Persist collapsed/expanded state
   useEffect(() => {
-    try { localStorage.setItem('boodschappen:showRecent', String(showRecent)) } catch {}
+    try { localStorage.setItem('grocery:showRecent', String(showRecent)) } catch {}
   }, [showRecent])
   useEffect(() => {
-    try { localStorage.setItem('boodschappen:showMeals', String(showMeals)) } catch {}
+    try { localStorage.setItem('grocery:showMeals', String(showMeals)) } catch {}
   }, [showMeals])
 
   // Track keyboard open/close via visualViewport to move input bar up
@@ -135,12 +138,25 @@ export default function BoodschappenView({ onOpenMenu }) {
     setLoading(false)
   }
 
-  /** Background sync — silently refreshes, never sets error/loading */
+  /** Background sync — merges server state into local order to prevent shuffling */
   function syncItems() {
     api.getBringItems()
       .then(data => {
-        setItems(data.purchase || [])
-        setRecentItems(data.recently || [])
+        const serverPurchase = data.purchase || []
+        const serverRecent = data.recently || []
+
+        setItems(prev => {
+          const serverMap = new Map(serverPurchase.map(i => [i.uuid, i]))
+          // Keep existing items in their current order, update their data
+          const merged = prev
+            .filter(i => !i._ghost && serverMap.has(i.uuid))
+            .map(i => ({ ...serverMap.get(i.uuid) }))
+          const mergedUuids = new Set(merged.map(i => i.uuid))
+          // Append any new items from server that we don't have yet (at the top)
+          const newItems = serverPurchase.filter(i => !mergedUuids.has(i.uuid))
+          return [...newItems, ...merged]
+        })
+        setRecentItems(serverRecent)
       })
       .catch(() => {}) // silent
   }
@@ -261,6 +277,64 @@ export default function BoodschappenView({ onOpenMenu }) {
         setItems(prev => prev.filter(i => i.uuid !== item.uuid))
         setRecentItems(prev => [item, ...prev])
       })
+  }
+
+  function handleStartEdit(item) {
+    if (item._ghost) return
+    setEditingItem(item.uuid)
+    setEditName(item.itemId)
+    setEditSpec(item.specification || '')
+  }
+
+  function handleCancelEdit() {
+    setEditingItem(null)
+    setEditName('')
+    setEditSpec('')
+  }
+
+  function handleSaveEdit(item) {
+    const newSpec = editSpec.trim()
+    const oldSpec = (item.specification || '').trim()
+
+    // Close edit mode immediately
+    setEditingItem(null)
+
+    // Only call API if specification actually changed
+    // (name is read-only — Bring! doesn't support renaming, only spec changes)
+    if (newSpec === oldSpec) {
+      setEditName('')
+      setEditSpec('')
+      return
+    }
+
+    // Optimistic: update the item in-place
+    setItems(prev => prev.map(i =>
+      i.uuid === item.uuid ? { ...i, specification: newSpec } : i
+    ))
+    setEditName('')
+    setEditSpec('')
+
+    // Upsert via API (pass existing uuid to update, not create duplicate), then sync
+    api.addBringItem(item.itemId, newSpec, item.uuid)
+      .then(() => syncItems())
+      .catch(err => {
+        console.error('Failed to update item:', err)
+        // Revert on failure
+        setItems(prev => prev.map(i =>
+          i.uuid === item.uuid ? { ...i, specification: oldSpec } : i
+        ))
+      })
+  }
+
+  function handleEditKeyDown(e, item) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSaveEdit(item)
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      handleCancelEdit()
+    }
   }
 
   function handleInputKeyDown(e) {
@@ -394,21 +468,25 @@ export default function BoodschappenView({ onOpenMenu }) {
             </div>
           )}
 
-          {items.map(item => (
+          {items.map(item => {
+            const isEditing = editingItem === item.uuid
+            return (
             <div
               key={item.uuid}
               className={`rounded-2xl shadow-card px-3 py-2.5 flex items-center gap-3 transition-all duration-300 ${
                 completing[item.uuid]
                   ? 'opacity-0 scale-95 -translate-x-4'
-                  : item._ghost
-                    ? 'bg-white/60 animate-pulse'
-                    : 'bg-white'
+                  : isEditing
+                    ? 'bg-white ring-1 ring-accent-mint/40'
+                    : item._ghost
+                      ? 'bg-white/60 animate-pulse'
+                      : 'bg-white'
               }`}
             >
               <button
-                onClick={() => !item._ghost && handleComplete(item)}
+                onClick={() => !item._ghost && !isEditing && handleComplete(item)}
                 className="flex-shrink-0 relative"
-                disabled={item._ghost}
+                disabled={item._ghost || isEditing}
               >
                 {item._ghost && !item.imageUrl ? (
                   <div className="w-9 h-9 rounded-lg bg-gray-100 animate-pulse" />
@@ -427,14 +505,49 @@ export default function BoodschappenView({ onOpenMenu }) {
                   </div>
                 )}
               </button>
-              <div className="flex-1 min-w-0">
-                <p className={`font-medium text-sm ${item._ghost ? 'text-gray-400' : 'text-gray-800'}`}>{item.itemId}</p>
-                {item.specification && (
-                  <p className="text-gray-400 text-xs truncate">{item.specification}</p>
-                )}
-              </div>
+              {isEditing ? (
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <p className="font-medium text-sm text-gray-800">{item.itemId}</p>
+                  <input
+                    type="text"
+                    value={editSpec}
+                    onChange={e => setEditSpec(e.target.value)}
+                    onKeyDown={e => handleEditKeyDown(e, item)}
+                    placeholder="Details (bijv. '2 liter')"
+                    className="w-full text-xs px-2.5 py-1.5 bg-gray-50 rounded-lg border border-gray-100 focus:outline-none focus:border-accent-mint/50 text-gray-600 placeholder-gray-300"
+                    autoFocus
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSaveEdit(item)}
+                      className="text-xs font-medium text-accent-mint px-2 py-0.5 rounded-md hover:bg-accent-mint/10 transition-colors"
+                    >
+                      Opslaan
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="text-xs text-gray-400 px-2 py-0.5 rounded-md hover:bg-gray-100 transition-colors"
+                    >
+                      Annuleren
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() => handleStartEdit(item)}
+                >
+                  <p className={`font-medium text-sm ${item._ghost ? 'text-gray-400' : 'text-gray-800'}`}>{item.itemId}</p>
+                  {item.specification ? (
+                    <p className="text-gray-400 text-xs truncate">{item.specification}</p>
+                  ) : !item._ghost && (
+                    <p className="text-gray-300 text-xs">Tik om details toe te voegen</p>
+                  )}
+                </div>
+              )}
             </div>
-          ))}
+            )
+          })}
 
           {/* Recently completed items (collapsible) */}
           {recentItems.length > 0 && (

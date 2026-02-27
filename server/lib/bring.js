@@ -295,11 +295,11 @@ export class BringClient {
     return translations.catalog || []
   }
 
-  async addItem(listUuid, itemName, specification = '') {
+  async addItem(listUuid, itemName, specification = '', existingUuid = null) {
     const translations = await this._getTranslations()
     const deItemName = this._translateFromLocale(itemName, translations)
 
-    const uuid = crypto.randomUUID()
+    const uuid = existingUuid || crypto.randomUUID()
     return this._request('PUT', `/v2/bringlists/${listUuid}/items`, {
       json: {
         changes: [{

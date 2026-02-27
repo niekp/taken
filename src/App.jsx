@@ -4,7 +4,7 @@ import Login from './components/Login'
 import WeekView from './components/WeekView'
 import SchedulesView from './components/SchedulesView'
 import MealsView from './components/MealsView'
-import BoodschappenView from './components/BoodschappenView'
+import GroceryView from './components/GroceryView'
 import DagschemaView from './components/DagschemaView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
@@ -18,7 +18,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     try {
       const saved = localStorage.getItem('activeTab')
-      if (saved && ['weekly', 'meals', 'schedules', 'boodschappen', 'dagschema'].includes(saved)) return saved
+      if (saved && ['weekly', 'meals', 'schedules', 'grocery', 'dagschema'].includes(saved)) return saved
     } catch {}
     return 'weekly'
   })
@@ -86,9 +86,9 @@ export default function App() {
     setIsRestoringSession(false)
   }, [users])
 
-  // If saved tab was 'boodschappen' but Bring is disabled, fall back to weekly
+  // If saved tab was 'grocery' but Bring is disabled, fall back to weekly
   useEffect(() => {
-    if (view === 'boodschappen' && bringEnabled === false) {
+    if (view === 'grocery' && bringEnabled === false) {
       setView('weekly')
     }
   }, [bringEnabled])
@@ -221,8 +221,8 @@ export default function App() {
           presentationMode={presentationMode}
           onTogglePresentation={() => setPresentationMode(!presentationMode)}
         />
-      ) : view === 'boodschappen' ? (
-        <BoodschappenView
+      ) : view === 'grocery' ? (
+        <GroceryView
           onOpenMenu={() => setShowMenu(true)}
         />
       ) : view === 'dagschema' ? (
@@ -267,9 +267,9 @@ export default function App() {
             </button>
             {bringEnabled && (
               <button
-                onClick={() => setView('boodschappen')}
+                onClick={() => setView('grocery')}
                 className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-                  view === 'boodschappen' ? 'text-accent-mint' : 'text-gray-400'
+                  view === 'grocery' ? 'text-accent-mint' : 'text-gray-400'
                 }`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

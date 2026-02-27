@@ -136,9 +136,9 @@ export const api = {
 
   getBringCatalog: () => request('/bring/catalog'),
 
-  addBringItem: (name, specification) => request('/bring/items', {
+  addBringItem: (name, specification, uuid) => request('/bring/items', {
     method: 'POST',
-    body: JSON.stringify({ name, specification }),
+    body: JSON.stringify({ name, specification, uuid }),
   }),
 
   completeBringItem: (name, uuid) => request('/bring/items/complete', {

@@ -74,11 +74,11 @@ export async function addItem(req, res) {
     const config = bringRepo.getConfig()
     if (!config.list_uuid) return res.status(400).json({ error: 'Geen lijst geselecteerd' })
 
-    const { name, specification } = req.body
+    const { name, specification, uuid } = req.body
     if (!name) return res.status(400).json({ error: 'Naam is verplicht' })
 
     await ensureLoggedIn(c)
-    await c.addItem(config.list_uuid, name, specification || '')
+    await c.addItem(config.list_uuid, name, specification || '', uuid || null)
     res.json({ success: true })
   } catch (err) {
     console.error('Bring addItem error:', err.message)
