@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import { getUserColor } from '../lib/colors'
+import useLiveSync from '../hooks/useLiveSync'
 
 const DAY_NAMES = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
 const DAY_SHORT = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
@@ -77,6 +78,10 @@ export default function MealsView({ users, onOpenMenu, presentationMode, onToggl
       console.error('Failed to load suggestions:', err)
     }
   }
+
+  // Live sync: refetch when another client modifies meals or daily schedules
+  useLiveSync('meals', () => { loadMeals(); loadSuggestions() })
+  useLiveSync('daily-schedules', loadMeals)
 
   function getFilteredSuggestions() {
     const query = inputValue.trim().toLowerCase()

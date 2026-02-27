@@ -1,5 +1,6 @@
 import { BringClient } from '../lib/bring.js'
 import * as bringRepo from '../repositories/bringRepository.js'
+import { broadcast } from '../lib/liveSync.js'
 
 // Singleton client, lazily initialized
 let client = null
@@ -79,6 +80,7 @@ export async function addItem(req, res) {
 
     await ensureLoggedIn(c)
     await c.addItem(config.list_uuid, name, specification || '', uuid || null)
+    broadcast('grocery')
     res.json({ success: true })
   } catch (err) {
     console.error('Bring addItem error:', err.message)
@@ -100,6 +102,7 @@ export async function completeItem(req, res) {
 
     await ensureLoggedIn(c)
     await c.completeItem(config.list_uuid, name, uuid)
+    broadcast('grocery')
     res.json({ success: true })
   } catch (err) {
     console.error('Bring completeItem error:', err.message)
@@ -121,6 +124,7 @@ export async function removeItem(req, res) {
 
     await ensureLoggedIn(c)
     await c.removeItem(config.list_uuid, name, uuid)
+    broadcast('grocery')
     res.json({ success: true })
   } catch (err) {
     console.error('Bring removeItem error:', err.message)

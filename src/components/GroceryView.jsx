@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { api } from '../lib/api'
+import useLiveSync from '../hooks/useLiveSync'
 
 const DAY_SHORT = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
 
@@ -182,6 +183,9 @@ export default function GroceryView({ onOpenMenu }) {
       console.error('Failed to load catalog:', err)
     }
   }
+
+  // Live sync: use merge-based sync when another client modifies the grocery list
+  useLiveSync('grocery', syncItems)
 
   const handleAdd = useCallback((nameOverride, catalogItem) => {
     const name = (nameOverride || inputValue).trim()

@@ -1,4 +1,5 @@
 import * as taskRepo from '../repositories/taskRepository.js'
+import { broadcast } from '../lib/liveSync.js'
 
 export function list(req, res) {
   const { from, to } = req.query
@@ -16,12 +17,14 @@ export function create(req, res) {
   if (!date) return res.status(400).json({ error: 'Date is required' })
 
   const task = taskRepo.create(req.body)
+  broadcast('tasks')
   res.status(201).json(task)
 }
 
 export function update(req, res) {
   const task = taskRepo.update(req.params.id, req.body)
   if (!task) return res.status(404).json({ error: 'Task not found' })
+  broadcast('tasks')
   res.json(task)
 }
 
@@ -31,6 +34,7 @@ export function reassign(req, res) {
   if (existing.completed_at) return res.status(400).json({ error: 'Cannot reassign a completed task' })
 
   const task = taskRepo.reassign(req.params.id, req.body)
+  broadcast('tasks')
   res.json(task)
 }
 
@@ -40,12 +44,14 @@ export function postpone(req, res) {
   if (existing.completed_at) return res.status(400).json({ error: 'Cannot postpone a completed task' })
 
   const task = taskRepo.postpone(req.params.id)
+  broadcast('tasks')
   res.json(task)
 }
 
 export function remove(req, res) {
   const deleted = taskRepo.remove(req.params.id)
   if (!deleted) return res.status(404).json({ error: 'Task not found (or is a scheduled task)' })
+  broadcast('tasks')
   res.json({ success: true })
 }
 
@@ -58,6 +64,7 @@ export function complete(req, res) {
   if (existing.completed_at) return res.status(400).json({ error: 'Task already completed' })
 
   const result = taskRepo.complete(req.params.id, user_id)
+  broadcast('tasks')
   res.json(result)
 }
 
@@ -67,11 +74,13 @@ export function uncomplete(req, res) {
   if (!existing.completed_at) return res.status(400).json({ error: 'Task not completed' })
 
   const task = taskRepo.uncomplete(req.params.id)
+  broadcast('tasks')
   res.json(task)
 }
 
 export function housekeeping(req, res) {
   const moved = taskRepo.runHousekeeping()
+  if (moved > 0) broadcast('tasks')
   res.json({ moved })
 }
 

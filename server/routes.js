@@ -6,8 +6,13 @@ import * as mealController from './controllers/mealController.js'
 import * as bringController from './controllers/bringController.js'
 import * as dailyScheduleController from './controllers/dailyScheduleController.js'
 import * as pushController from './controllers/pushController.js'
+import { sseHandler, revisionHandler } from './lib/liveSync.js'
 
 const router = Router()
+
+// Live sync
+router.get('/events', sseHandler)
+router.get('/revision', revisionHandler)
 
 // Users
 router.get('/users', userController.list)

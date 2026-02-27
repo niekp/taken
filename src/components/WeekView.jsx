@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
 import { getUserColor } from '../lib/colors'
+import useLiveSync from '../hooks/useLiveSync'
 
 const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -77,6 +78,11 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     }
     setIsLoading(false)
   }
+
+  // Live sync: refetch when another client modifies tasks, meals, or daily schedules
+  useLiveSync('tasks', loadData)
+  useLiveSync('meals', loadData)
+  useLiveSync('daily-schedules', loadData)
 
   function getItemsForDay(dayIndex) {
     const dateStr = formatDateISO(weekDates[dayIndex])

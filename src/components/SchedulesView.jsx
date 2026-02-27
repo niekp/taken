@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 import ScheduleModal from './ScheduleModal'
 import Confetti from './Confetti'
+import useLiveSync from '../hooks/useLiveSync'
 
 export default function SchedulesView({ currentUser, users, onOpenMenu, presentationMode, onTogglePresentation }) {
   const [schedules, setSchedules] = useState([])
@@ -32,6 +33,9 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
     }
     setLoading(false)
   }
+
+  // Live sync: refetch when another client modifies schedules
+  useLiveSync('schedules', loadSchedules)
 
   function getStatus(schedule) {
     if (!schedule.next_date) return { status: 'upcoming', days_remaining: 999, days_late: 0 }
