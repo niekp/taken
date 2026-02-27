@@ -166,4 +166,29 @@ export const api = {
     request(`/daily-schedules/entries?from=${from}&to=${to}`),
 
   getDailyScheduleLabels: () => request('/daily-schedules/labels'),
+
+  // Push notifications
+  getVapidKey: () => request('/push/vapid-key'),
+
+  getPushStatus: (endpoint) => request(`/push/status?endpoint=${encodeURIComponent(endpoint)}`),
+
+  subscribePush: (userId, subscription, notifyTime) => request('/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, subscription, notify_time: notifyTime }),
+  }),
+
+  unsubscribePush: (endpoint) => request('/push/unsubscribe', {
+    method: 'POST',
+    body: JSON.stringify({ endpoint }),
+  }),
+
+  updatePushSettings: (endpoint, settings) => request('/push/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ endpoint, ...settings }),
+  }),
+
+  testPush: (userId) => request('/push/test', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId }),
+  }),
 }

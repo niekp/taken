@@ -10,6 +10,7 @@ import Menu from './components/Menu'
 import Stats from './components/Stats'
 import Confetti from './components/Confetti'
 import UserManagementView from './components/UserManagementView'
+import NotificationSettings from './components/NotificationSettings'
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
@@ -18,6 +19,7 @@ export default function App() {
   const [showMenu, setShowMenu] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showUserManagement, setShowUserManagement] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [bringEnabled, setBringEnabled] = useState(false)
   const [presentationMode, setPresentationMode] = useState(() => {
@@ -246,6 +248,10 @@ export default function App() {
             setShowMenu(false)
             setShowUserManagement(true)
           }}
+          onOpenNotifications={() => {
+            setShowMenu(false)
+            setShowNotifications(true)
+          }}
         />
       )}
 
@@ -274,6 +280,13 @@ export default function App() {
             }
           }}
           onClose={() => setShowUserManagement(false)}
+        />
+      )}
+
+      {showNotifications && (
+        <NotificationSettings
+          currentUser={currentUser}
+          onClose={() => setShowNotifications(false)}
         />
       )}
     </div>

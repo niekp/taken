@@ -5,6 +5,7 @@ import * as taskController from './controllers/taskController.js'
 import * as mealController from './controllers/mealController.js'
 import * as bringController from './controllers/bringController.js'
 import * as dailyScheduleController from './controllers/dailyScheduleController.js'
+import * as pushController from './controllers/pushController.js'
 
 const router = Router()
 
@@ -59,5 +60,13 @@ router.get('/daily-schedules', dailyScheduleController.list)
 router.post('/daily-schedules', dailyScheduleController.create)
 router.put('/daily-schedules/:id', dailyScheduleController.update)
 router.delete('/daily-schedules/:id', dailyScheduleController.remove)
+
+// Push notifications
+router.get('/push/vapid-key', pushController.vapidKey)
+router.get('/push/status', pushController.status)
+router.post('/push/subscribe', pushController.subscribe)
+router.post('/push/unsubscribe', pushController.unsubscribe)
+router.put('/push/settings', pushController.updateSettings)
+router.post('/push/test', pushController.test)
 
 export default router

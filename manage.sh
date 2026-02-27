@@ -771,6 +771,35 @@ bring_menu() {
   done
 }
 
+# ── Notification Actions ────────────────────────────────────────────
+
+action_generate_vapid() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}VAPID Keys Genereren${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+  echo -e "    ${C_DIM}Genereren...${C_RESET}"
+
+  local output
+  output=$(exec_cli generate-vapid-keys 2>&1) || true
+
+  show_output "VAPID Keys" "$output\n\n${C_YELLOW}Voeg deze keys toe aan je docker-compose.yml environment.${C_RESET}"
+}
+
+notification_menu() {
+  while true; do
+    local choice
+    if ! menu_select choice "Notificaties" \
+      "VAPID keys genereren|Genereer keys voor push notificaties"; then
+      return
+    fi
+
+    case "$choice" in
+      0) action_generate_vapid ;;
+    esac
+  done
+}
+
 main_menu() {
   while true; do
     local choice
@@ -778,7 +807,8 @@ main_menu() {
     if $LOCAL_MODE; then
       if ! menu_select choice "Hoofdmenu" \
         "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
-        "Bring! Instellingen|Boodschappenlijst koppelen"; then
+        "Bring! Instellingen|Boodschappenlijst koppelen" \
+        "Notificaties|Push notificaties instellen"; then
         cleanup
         exit 0
       fi
@@ -786,11 +816,13 @@ main_menu() {
       case "$choice" in
         0) user_menu ;;
         1) bring_menu ;;
+        2) notification_menu ;;
       esac
     else
       if ! menu_select choice "Hoofdmenu" \
         "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
         "Bring! Instellingen|Boodschappenlijst koppelen" \
+        "Notificaties|Push notificaties instellen" \
         "Status|Container status bekijken" \
         "Logs bekijken|Live logboek volgen" \
         "Database backup|Maak een kopie van de database" \
@@ -803,11 +835,12 @@ main_menu() {
       case "$choice" in
         0) user_menu ;;
         1) bring_menu ;;
-        2) action_status ;;
-        3) action_logs ;;
-        4) check_running && action_backup ;;
-        5) action_restart ;;
-        6) action_update ;;
+        2) notification_menu ;;
+        3) action_status ;;
+        4) action_logs ;;
+        5) check_running && action_backup ;;
+        6) action_restart ;;
+        7) action_update ;;
       esac
     fi
   done

@@ -8,4 +8,7 @@ services:
       - ./data:/data
     environment:
       - DB_PATH=/data/chores.db
+      # Push notifications (optional) — generate with: ./manage.sh → Notificaties → VAPID keys genereren
+      - VAPID_PUBLIC_KEY=
+      - VAPID_PRIVATE_KEY=
     restart: unless-stopped

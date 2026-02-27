@@ -38,6 +38,9 @@ Bring! Commands:
   bring-status                        Show current Bring! configuration
   bring-remove                        Remove Bring! configuration
 
+Setup Commands:
+  generate-vapid-keys                 Generate VAPID keys for push notifications
+
   help                                Show this help message
 
 Colors: blue, pink, green, purple, orange, red, teal, yellow (default: blue)
@@ -76,6 +79,19 @@ function prompt(question) {
 async function main() {
   if (!command || command === 'help') {
     usage()
+    process.exit(0)
+  }
+
+  // Commands that don't need DB
+  if (command === 'generate-vapid-keys') {
+    const webpushModule = await import('web-push')
+    const webpush = webpushModule.default || webpushModule
+    const keys = webpush.generateVAPIDKeys()
+    console.log('\nVAPID Keys generated:\n')
+    console.log(`VAPID_PUBLIC_KEY=${keys.publicKey}`)
+    console.log(`VAPID_PRIVATE_KEY=${keys.privateKey}`)
+    console.log(`\nAdd these to your docker-compose.yml environment section.`)
+    console.log(`The public key is also needed as VAPID_PUBLIC_KEY.\n`)
     process.exit(0)
   }
 

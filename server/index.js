@@ -2,8 +2,10 @@ import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+import cron from 'node-cron'
 import { initDb } from './db.js'
 import apiRouter from './routes.js'
+import * as notifications from './lib/notifications.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -32,6 +34,18 @@ if (fs.existsSync(distPath)) {
 
 // Initialize database (runs migrations) and start server
 await initDb()
+
+// Initialize push notifications (no-op if VAPID keys not set)
+notifications.init()
+
+// Cron: every 15 minutes, check if any subscriptions need their daily notification
+cron.schedule('*/15 * * * *', () => {
+  const now = new Date()
+  const time = `${String(now.getHours()).padStart(2, '0')}:${String(Math.floor(now.getMinutes() / 15) * 15).padStart(2, '0')}`
+  notifications.sendDailySummaries(time).catch(err => {
+    console.error('Error sending daily summaries:', err)
+  })
+})
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Huishouden server running on port ${PORT}`)

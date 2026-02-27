@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'app_icon.jpeg'],
       manifest: {
@@ -31,35 +34,9 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpeg}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }
-            }
-          },
-          {
-            urlPattern: /\.(?:js|css)$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'static-resources',
-              expiration: { maxEntries: 50, maxAgeSeconds: 0 }
-            }
-          },
-          {
-            urlPattern: /\.html$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'html-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 0 }
-            }
-          }
-        ]
       }
     })
   ],
