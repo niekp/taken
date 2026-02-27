@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 
-export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDelete, onDeleteAttempt, onPostpone, users, isToday, presentationMode, resetKey }) {
+export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDelete, onDeleteAttempt, onPostpone, users, isToday, presentationMode, resetKey, showCategory }) {
   const isCompleted = !!task.completed_at
   const isGhost = !!task.is_ghost
   const isOverdue = task.original_date && task.date !== task.original_date
@@ -155,6 +155,9 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
           <p className={`font-medium text-sm leading-tight whitespace-normal ${isCompleted ? 'line-through text-gray-400' : 'text-gray-800'}`}>
             {task.title}
           </p>
+          {showCategory && task.category && (
+            <span className="inline-flex items-center mt-0.5 text-[10px] text-gray-400">{task.category}</span>
+          )}
           {isOverdue && !isCompleted && (
             <span className="inline-flex items-center mt-1 text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-medium">
               Uitgesteld
@@ -306,6 +309,11 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
               {isOverdue && !isCompleted && (
                 <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-red-50 text-red-600">
                   Uitgesteld
+                </span>
+              )}
+              {showCategory && task.category && (
+                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-50 text-gray-400">
+                  {task.category}
                 </span>
               )}
               {isCompleted && completedByUser && (

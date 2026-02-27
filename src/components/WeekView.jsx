@@ -96,18 +96,14 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
       dayGhosts = dayGhosts.filter(g => g.assigned_to === filter || g.is_both)
     }
 
-    // Sort: uncompleted first, then completed
-    dayTasks.sort((a, b) => {
-      if (a.completed_at && !b.completed_at) return 1
-      if (!a.completed_at && b.completed_at) return -1
-      return 0
-    })
+    // Separate completed tasks — they go in a flat section at the bottom
+    const activeTasks = dayTasks.filter(t => !t.completed_at)
+    const completedTasks = dayTasks.filter(t => t.completed_at)
 
-    // Group by category: uncategorized first, then each category in order seen
-    // Merge ghosts into the same groups so they appear under their category
+    // Group active tasks + ghosts by category
     const uncategorized = []
     const categoryMap = new Map()
-    for (const task of [...dayTasks, ...dayGhosts]) {
+    for (const task of [...activeTasks, ...dayGhosts]) {
       const cat = task.category || null
       if (!cat) {
         uncategorized.push(task)
@@ -124,7 +120,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
       taskGroups.push({ category, items: catItems })
     }
 
-    return { tasks: dayTasks, ghosts: dayGhosts, taskGroups }
+    return { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks }
   }
 
   async function handleCompleteTask(task) {
@@ -234,8 +230,8 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     )
   }
 
-  /** Render grouped task list with category headers */
-  function renderGroupedTasks(taskGroups, renderTask, renderGhost, compact = false) {
+  /** Render grouped task list with category headers, completed tasks at bottom */
+  function renderGroupedTasks(taskGroups, completedTasks, renderTask, renderGhost, compact = false) {
     return (
       <>
         {taskGroups.map(({ category, items }) => (
@@ -249,6 +245,15 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             {items.map(item => item.is_ghost ? renderGhost(item) : renderTask(item))}
           </div>
         ))}
+        {completedTasks && completedTasks.length > 0 && (
+          <div>
+            <div className={`flex items-center gap-2 ${compact ? 'mt-1.5 mb-0.5' : 'mt-4 mb-1.5'}`}>
+              <p className={`${compact ? 'text-[10px]' : 'text-xs'} font-medium text-gray-400 uppercase tracking-wide`}>Afgerond</p>
+              <div className="flex-1 h-px bg-gray-200"></div>
+            </div>
+            {completedTasks.map(task => renderTask(task, true))}
+          </div>
+        )}
       </>
     )
   }
@@ -308,7 +313,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         {/* Desktop: all days side by side */}
         <div className="md:flex-1 md:flex md:gap-4 md:overflow-x-auto hidden">
            {DAYS.map((day, i) => {
-            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups } = getItemsForDay(i)
+            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(i)
             const isToday = i === currentDayIndex && currentWeekOffset === 0
             const hasItems = dayTasks.length > 0 || dayGhosts.length > 0
 
@@ -327,7 +332,8 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                   {renderDayInfoCard(i, true)}
                   {renderGroupedTasks(
                     taskGroups,
-                    task => (
+                    completedTasks,
+                    (task, showCategory) => (
                       <TaskItem
                         key={task.id}
                         task={task}
@@ -336,6 +342,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                         users={users}
                         isToday={isToday}
                         presentationMode={true}
+                        showCategory={showCategory}
                       />
                     ),
                     ghost => (
@@ -390,13 +397,14 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
             <div className="p-3 space-y-2">
               {(() => {
-                const { tasks: dayTasks, ghosts: dayGhosts, taskGroups } = getItemsForDay(activeDay)
+                const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(activeDay)
                 return (
                   <>
                     {renderDayInfoCard(activeDay)}
                     {renderGroupedTasks(
                       taskGroups,
-                      task => (
+                      completedTasks,
+                      (task, showCategory) => (
                         <TaskItem
                           key={task.id}
                           task={task}
@@ -405,6 +413,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                           users={users}
                           isToday={activeDay === currentDayIndex && currentWeekOffset === 0}
                           presentationMode={true}
+                          showCategory={showCategory}
                         />
                       ),
                       ghost => (
@@ -558,14 +567,15 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
         <div className="space-y-3">
           {(() => {
-            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups } = getItemsForDay(activeDay)
+            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(activeDay)
             const isToday = activeDay === currentDayIndex && currentWeekOffset === 0
             return (
               <>
                 {renderDayInfoCard(activeDay)}
                 {renderGroupedTasks(
                   taskGroups,
-                  task => (
+                  completedTasks,
+                  (task, showCategory) => (
                     <TaskItem
                       key={task.id}
                       task={task}
@@ -579,6 +589,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                       isToday={isToday}
                       presentationMode={false}
                       resetKey={resetKey}
+                      showCategory={showCategory}
                     />
                   ),
                   ghost => (
