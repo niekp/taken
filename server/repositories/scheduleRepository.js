@@ -63,18 +63,36 @@ export function update(id, { title, category, interval_days, assigned_to, is_bot
     WHERE id = ?
   `).run(title, category || '', interval_days || 7, assigned_to || null, is_both ? 1 : 0, id)
 
-  // Also update the title on any uncompleted tasks for this schedule
+  // Also update the title and category on any uncompleted tasks for this schedule
   db.prepare(`
-    UPDATE tasks SET title = ?, assigned_to = ?, is_both = ?
+    UPDATE tasks SET title = ?, assigned_to = ?, is_both = ?, category = ?
     WHERE schedule_id = ? AND completed_at IS NULL
-  `).run(title, assigned_to || null, is_both ? 1 : 0, id)
+  `).run(title, assigned_to || null, is_both ? 1 : 0, category || null, id)
 
   return findById(id)
 }
 
 export function remove(id) {
   const db = getDb()
-  // tasks cascade-delete via FK
+
+  // 1. Snapshot category onto completed tasks so they keep it after orphaning
+  db.prepare(`
+    UPDATE tasks SET category = (SELECT s.category FROM schedules s WHERE s.id = tasks.schedule_id)
+    WHERE schedule_id = ? AND completed_at IS NOT NULL
+  `).run(id)
+
+  // 2. Detach completed tasks from the schedule (preserves them for stats/history)
+  db.prepare(`
+    UPDATE tasks SET schedule_id = NULL
+    WHERE schedule_id = ? AND completed_at IS NOT NULL
+  `).run(id)
+
+  // 3. Delete uncompleted (future) tasks for this schedule
+  db.prepare(`
+    DELETE FROM tasks WHERE schedule_id = ? AND completed_at IS NULL
+  `).run(id)
+
+  // 4. Delete the schedule itself (CASCADE has nothing left to touch)
   const result = db.prepare('DELETE FROM schedules WHERE id = ?').run(id)
   return result.changes > 0
 }

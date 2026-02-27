@@ -24,7 +24,7 @@ export function findByDateRange(from, to) {
       u.name AS assigned_to_name,
       cu.name AS completed_by_name,
       s.interval_days,
-      s.category
+      COALESCE(t.category, s.category) AS category
     FROM tasks t
     LEFT JOIN users u ON t.assigned_to = u.id
     LEFT JOIN users cu ON t.completed_by = cu.id
@@ -42,7 +42,7 @@ export function findById(id) {
       u.name AS assigned_to_name,
       cu.name AS completed_by_name,
       s.interval_days,
-      s.category
+      COALESCE(t.category, s.category) AS category
     FROM tasks t
     LEFT JOIN users u ON t.assigned_to = u.id
     LEFT JOIN users cu ON t.completed_by = cu.id
@@ -73,9 +73,9 @@ export function createTaskForSchedule(schedule, date) {
   const db = getDb()
   const id = generateId()
   db.prepare(`
-    INSERT INTO tasks (id, schedule_id, title, date, original_date, assigned_to, is_both)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, schedule.id, schedule.title, date, date, schedule.assigned_to || null, schedule.is_both ? 1 : 0)
+    INSERT INTO tasks (id, schedule_id, title, date, original_date, assigned_to, is_both, category)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, schedule.id, schedule.title, date, date, schedule.assigned_to || null, schedule.is_both ? 1 : 0, schedule.category || null)
   return findById(id)
 }
 
@@ -263,7 +263,7 @@ export function findCompletionHistory(limit = 50) {
   return db.prepare(`
     SELECT t.id, t.title, t.date, t.completed_at, t.completed_by,
       u.name AS completed_by_name,
-      s.category
+      COALESCE(t.category, s.category) AS category
     FROM tasks t
     LEFT JOIN users u ON t.completed_by = u.id
     LEFT JOIN schedules s ON t.schedule_id = s.id
