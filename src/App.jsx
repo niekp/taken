@@ -5,6 +5,7 @@ import WeekView from './components/WeekView'
 import SchedulesView from './components/SchedulesView'
 import MealsView from './components/MealsView'
 import BoodschappenView from './components/BoodschappenView'
+import DagschemaView from './components/DagschemaView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
 import Confetti from './components/Confetti'
@@ -12,7 +13,7 @@ import Confetti from './components/Confetti'
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
-  const [view, setView] = useState('weekly') // 'weekly' | 'meals' | 'schedules' | 'boodschappen'
+  const [view, setView] = useState('weekly') // 'weekly' | 'meals' | 'schedules' | 'boodschappen' | 'dagschema'
   const [showMenu, setShowMenu] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
@@ -155,6 +156,11 @@ export default function App() {
         <BoodschappenView
           onOpenMenu={() => setShowMenu(true)}
         />
+      ) : view === 'dagschema' ? (
+        <DagschemaView
+          users={users}
+          onBack={() => setView('weekly')}
+        />
       ) : (
         <SchedulesView
           currentUser={currentUser}
@@ -229,6 +235,10 @@ export default function App() {
           onOpenStats={() => {
             setShowMenu(false)
             setShowStats(true)
+          }}
+          onOpenDagschema={() => {
+            setShowMenu(false)
+            setView('dagschema')
           }}
         />
       )}

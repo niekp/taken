@@ -11,6 +11,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   const [tasks, setTasks] = useState([])
   const [ghosts, setGhosts] = useState([])
   const [meals, setMeals] = useState([])
+  const [dailyEntries, setDailyEntries] = useState({})
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [filter, setFilter] = useState('all')
@@ -35,7 +36,10 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   const weekDates = getWeekDates(currentWeekOffset)
 
   function formatDateISO(d) {
-    return d.toISOString().split('T')[0]
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
 
   useEffect(() => {
@@ -58,14 +62,16 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         await api.runHousekeeping()
       }
 
-      const [taskData, mealData] = await Promise.all([
+      const [taskData, mealData, entriesData] = await Promise.all([
         api.getTasks(from, to),
         api.getMeals(from, to),
+        api.getDailyScheduleEntries(from, to),
       ])
 
       setTasks(taskData.tasks || [])
       setGhosts(taskData.ghosts || [])
       setMeals(mealData)
+      setDailyEntries(entriesData || {})
     } catch (err) {
       console.error('Failed to load data:', err)
     }
@@ -144,6 +150,48 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     return meals.find(m => m.date === dateStr)
   }
 
+  function getDailyEntriesForDay(dayIndex) {
+    const dateStr = formatDateISO(weekDates[dayIndex])
+    return dailyEntries[dateStr] || []
+  }
+
+  function renderDailyScheduleSummary(dayIndex, compact = false) {
+    const entries = getDailyEntriesForDay(dayIndex)
+    if (entries.length === 0) return null
+
+    // Group by user: "Niek: Werk, Kind: Opvang"
+    const byUser = {}
+    entries.forEach(e => {
+      if (!byUser[e.user_name]) byUser[e.user_name] = []
+      byUser[e.user_name].push(e.label)
+    })
+
+    if (compact) {
+      // Compact: just show labels with colored dots
+      return (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200/60 rounded-xl">
+          <svg className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="text-xs text-indigo-700 truncate">
+            {Object.entries(byUser).map(([name, labels]) => `${name}: ${labels.join(', ')}`).join(' | ')}
+          </span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200/60 rounded-2xl">
+        <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <span className="text-xs font-medium text-indigo-700">
+          {Object.entries(byUser).map(([name, labels]) => `${name}: ${labels.join(', ')}`).join(' | ')}
+        </span>
+      </div>
+    )
+  }
+
   if (presentationMode) {
     return (
       <div className="h-screen p-4 md:p-6 bg-gradient-to-br from-pastel-cream to-pastel-mint/20 overflow-hidden flex flex-col">
@@ -219,6 +267,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                  {renderDailyScheduleSummary(i, true)}
                   {(() => {
                     const meal = getMealForDay(i)
                     return meal ? (
@@ -242,7 +291,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                   {dayGhosts.map(ghost => (
                     <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
                   ))}
-                  {!hasItems && !getMealForDay(i) && (
+                  {!hasItems && !getMealForDay(i) && getDailyEntriesForDay(i).length === 0 && (
                     <div className="text-center text-gray-400 py-8 text-sm">
                       Geen taken
                     </div>
@@ -293,6 +342,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 const meal = getMealForDay(activeDay)
                 return (
                   <>
+                    {renderDailyScheduleSummary(activeDay)}
                     {meal && (
                       <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200/60 rounded-2xl">
                         <span className="text-lg">🍽️</span>
@@ -464,6 +514,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             const meal = getMealForDay(activeDay)
             return (
               <>
+                {renderDailyScheduleSummary(activeDay)}
                 {meal && (
                   <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200/60 rounded-2xl">
                     <span className="text-lg">🍽️</span>

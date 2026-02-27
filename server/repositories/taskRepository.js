@@ -5,6 +5,13 @@ function toBooleans(task) {
   return { ...task, is_both: !!task.is_both }
 }
 
+function formatDateLocal(d) {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 /**
  * Find tasks within a date range, optionally enriched with user/schedule info.
  * @param {string} from - ISO date string (YYYY-MM-DD)
@@ -120,7 +127,7 @@ export function complete(id, userId) {
       // Next task date = this task's date + interval_days
       const taskDate = new Date(task.date + 'T00:00:00')
       taskDate.setDate(taskDate.getDate() + schedule.interval_days)
-      const nextDate = taskDate.toISOString().split('T')[0]
+      const nextDate = formatDateLocal(taskDate)
 
       nextTask = createTaskForSchedule(
         { ...schedule, is_both: !!schedule.is_both },
@@ -174,7 +181,7 @@ export function remove(id) {
  */
 export function runHousekeeping() {
   const db = getDb()
-  const today = new Date().toISOString().split('T')[0]
+  const today = formatDateLocal(new Date())
 
   const result = db.prepare(`
     UPDATE tasks
@@ -208,7 +215,7 @@ export function getGhostTasks(from, to) {
     // Ghost = task.date + interval_days
     const ghostDate = new Date(task.date + 'T00:00:00')
     ghostDate.setDate(ghostDate.getDate() + task.interval_days)
-    const ghostDateStr = ghostDate.toISOString().split('T')[0]
+    const ghostDateStr = formatDateLocal(ghostDate)
 
     if (ghostDateStr >= from && ghostDateStr <= to) {
       ghosts.push({

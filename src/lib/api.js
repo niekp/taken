@@ -130,4 +130,26 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ name, uuid }),
   }),
+
+  // Daily schedules (Dagschema)
+  getDailySchedules: () => request('/daily-schedules'),
+
+  createDailySchedule: (data) => request('/daily-schedules', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  updateDailySchedule: (id, data) => request(`/daily-schedules/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  deleteDailySchedule: (id) => request(`/daily-schedules/${id}`, {
+    method: 'DELETE',
+  }),
+
+  getDailyScheduleEntries: (from, to) =>
+    request(`/daily-schedules/entries?from=${from}&to=${to}`),
+
+  getDailyScheduleLabels: () => request('/daily-schedules/labels'),
 }

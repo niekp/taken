@@ -5,7 +5,10 @@ const DAY_NAMES = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vri
 const DAY_SHORT = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
 
 function formatDateISO(d) {
-  return d.toISOString().split('T')[0]
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function getDays() {
@@ -22,6 +25,7 @@ function getDays() {
 
 export default function MealsView({ onOpenMenu, presentationMode, onTogglePresentation }) {
   const [meals, setMeals] = useState([])
+  const [dailyEntries, setDailyEntries] = useState({})
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingDate, setEditingDate] = useState(null)
@@ -52,8 +56,12 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
     const from = formatDateISO(days[0])
     const to = formatDateISO(days[6])
     try {
-      const data = await api.getMeals(from, to)
+      const [data, entriesData] = await Promise.all([
+        api.getMeals(from, to),
+        api.getDailyScheduleEntries(from, to),
+      ])
       setMeals(data)
+      setDailyEntries(entriesData || {})
     } catch (err) {
       console.error('Failed to load meals:', err)
     }
@@ -140,6 +148,34 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
     return date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
       date.getFullYear() === today.getFullYear()
+  }
+
+  function getDailyEntriesForDate(dateStr) {
+    return dailyEntries[dateStr] || []
+  }
+
+  function renderDailyScheduleSummary(dateStr) {
+    const entries = getDailyEntriesForDate(dateStr)
+    if (entries.length === 0) return null
+
+    const byUser = {}
+    entries.forEach(e => {
+      if (!byUser[e.user_name]) byUser[e.user_name] = []
+      byUser[e.user_name].push(e.label)
+    })
+
+    return (
+      <div className="bg-white px-4 py-2.5 border-t border-gray-100">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="text-xs font-medium text-indigo-600">
+            {Object.entries(byUser).map(([name, labels]) => `${name}: ${labels.join(', ')}`).join(' | ')}
+          </span>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -231,6 +267,8 @@ export default function MealsView({ onOpenMenu, presentationMode, onTogglePresen
                   </button>
                 )}
               </div>
+
+              {renderDailyScheduleSummary(dateStr)}
 
               {isEditing ? (
                 <div className="bg-white px-4 py-3 border-t border-gray-100 rounded-b-2xl">

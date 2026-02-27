@@ -4,6 +4,7 @@ import * as scheduleController from './controllers/scheduleController.js'
 import * as taskController from './controllers/taskController.js'
 import * as mealController from './controllers/mealController.js'
 import * as bringController from './controllers/bringController.js'
+import * as dailyScheduleController from './controllers/dailyScheduleController.js'
 
 const router = Router()
 
@@ -47,5 +48,13 @@ router.get('/bring/items', bringController.getItems)
 router.post('/bring/items', bringController.addItem)
 router.post('/bring/items/complete', bringController.completeItem)
 router.post('/bring/items/remove', bringController.removeItem)
+
+// Daily schedules (static routes before parameterized)
+router.get('/daily-schedules/entries', dailyScheduleController.entriesForRange)
+router.get('/daily-schedules/labels', dailyScheduleController.labels)
+router.get('/daily-schedules', dailyScheduleController.list)
+router.post('/daily-schedules', dailyScheduleController.create)
+router.put('/daily-schedules/:id', dailyScheduleController.update)
+router.delete('/daily-schedules/:id', dailyScheduleController.remove)
 
 export default router

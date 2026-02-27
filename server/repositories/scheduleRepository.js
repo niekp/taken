@@ -49,7 +49,7 @@ export function create({ title, category, interval_days, assigned_to, is_both, c
   `).run(id, title, category || '', interval_days || 7, assigned_to || null, is_both ? 1 : 0, created_by || null)
 
   // Generate the first task on the given start_date (defaults to today)
-  const date = start_date || new Date().toISOString().split('T')[0]
+  const date = start_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
   const schedule = findById(id)
   createTaskForSchedule(schedule, date)
 

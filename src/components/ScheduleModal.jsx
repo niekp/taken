@@ -21,7 +21,13 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
   const [customInterval, setCustomInterval] = useState(false)
   const [assignedTo, setAssignedTo] = useState(editSchedule?.assigned_to || null)
   const [isBoth, setIsBoth] = useState(editSchedule?.is_both || false)
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  })
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const [showNewCategory, setShowNewCategory] = useState(false)

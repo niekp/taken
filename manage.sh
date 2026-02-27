@@ -6,6 +6,7 @@ COMPOSE_FILE=""
 SERVICE="taken"
 MANAGE_URL="https://raw.githubusercontent.com/niekp/taken/main/manage.sh"
 SELF="$(realpath "$0")"
+LOCAL_MODE=false
 
 # ── Terminal setup ──────────────────────────────────────────────────
 init_term() {
@@ -338,6 +339,10 @@ color_select() {
 # ── Docker helpers ──────────────────────────────────────────────────
 
 detect_compose_file() {
+  if $LOCAL_MODE; then
+    COMPOSE_FILE="(lokaal)"
+    return
+  fi
   if [[ -n "$COMPOSE_FILE" ]]; then
     return
   fi
@@ -353,14 +358,25 @@ detect_compose_file() {
 }
 
 dc() {
+  if $LOCAL_MODE; then
+    echo "Docker is niet beschikbaar in lokale modus." >&2
+    return 1
+  fi
   docker compose -f "$COMPOSE_FILE" "$@"
 }
 
 exec_cli() {
-  dc exec -T "$SERVICE" node server/cli.js "$@"
+  if $LOCAL_MODE; then
+    node server/cli.js "$@"
+  else
+    dc exec -T "$SERVICE" node server/cli.js "$@"
+  fi
 }
 
 check_running() {
+  if $LOCAL_MODE; then
+    return 0
+  fi
   if ! dc ps --status running -q "$SERVICE" &>/dev/null; then
     show_output "Fout" "${C_RED}Container is niet actief.${C_RESET}\n\nStart met:\n${C_BOLD}docker compose -f $COMPOSE_FILE up -d${C_RESET}"
     return 1
@@ -443,7 +459,11 @@ action_remove_user() {
 
   if confirm_action "Weet je zeker dat je \"$name\" wilt verwijderen?"; then
     local output
-    output=$(echo "y" | dc exec -T "$SERVICE" node server/cli.js remove-user "$name" 2>&1) || true
+    if $LOCAL_MODE; then
+      output=$(echo "y" | node server/cli.js remove-user "$name" 2>&1) || true
+    else
+      output=$(echo "y" | dc exec -T "$SERVICE" node server/cli.js remove-user "$name" 2>&1) || true
+    fi
     show_output "Resultaat" "$output"
   fi
 }
@@ -688,7 +708,11 @@ action_bring_remove() {
 
   if confirm_action "Weet je zeker dat je de Bring! configuratie wilt verwijderen?"; then
     local output
-    output=$(echo "y" | dc exec -T "$SERVICE" node server/cli.js bring-remove 2>&1) || true
+    if $LOCAL_MODE; then
+      output=$(echo "y" | node server/cli.js bring-remove 2>&1) || true
+    else
+      output=$(echo "y" | dc exec -T "$SERVICE" node server/cli.js bring-remove 2>&1) || true
+    fi
     show_output "Resultaat" "$output"
   fi
 }
@@ -718,37 +742,64 @@ bring_menu() {
 main_menu() {
   while true; do
     local choice
-    if ! menu_select choice "Hoofdmenu" \
-      "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
-      "Bring! Instellingen|Boodschappenlijst koppelen" \
-      "Status|Container status bekijken" \
-      "Logs bekijken|Live logboek volgen" \
-      "Database backup|Maak een kopie van de database" \
-      "Container herstarten|Service opnieuw starten" \
-      "Bijwerken|Script en image bijwerken (prod)"; then
-      cleanup
-      exit 0
-    fi
 
-    case "$choice" in
-      0) user_menu ;;
-      1) bring_menu ;;
-      2) action_status ;;
-      3) action_logs ;;
-      4) check_running && action_backup ;;
-      5) action_restart ;;
-      6) action_update ;;
-    esac
+    if $LOCAL_MODE; then
+      if ! menu_select choice "Hoofdmenu" \
+        "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
+        "Bring! Instellingen|Boodschappenlijst koppelen"; then
+        cleanup
+        exit 0
+      fi
+
+      case "$choice" in
+        0) user_menu ;;
+        1) bring_menu ;;
+      esac
+    else
+      if ! menu_select choice "Hoofdmenu" \
+        "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
+        "Bring! Instellingen|Boodschappenlijst koppelen" \
+        "Status|Container status bekijken" \
+        "Logs bekijken|Live logboek volgen" \
+        "Database backup|Maak een kopie van de database" \
+        "Container herstarten|Service opnieuw starten" \
+        "Bijwerken|Script en image bijwerken (prod)"; then
+        cleanup
+        exit 0
+      fi
+
+      case "$choice" in
+        0) user_menu ;;
+        1) bring_menu ;;
+        2) action_status ;;
+        3) action_logs ;;
+        4) check_running && action_backup ;;
+        5) action_restart ;;
+        6) action_update ;;
+      esac
+    fi
   done
 }
 
 # ── Entry Point ─────────────────────────────────────────────────────
-while getopts "f:" opt; do
+while getopts "f:l" opt; do
   case "$opt" in
     f) COMPOSE_FILE="$OPTARG" ;;
-    *) echo "Gebruik: $0 [-f docker-compose.yml]"; exit 1 ;;
+    l) LOCAL_MODE=true ;;
+    *) echo "Gebruik: $0 [-f docker-compose.yml] [-l]"; exit 1 ;;
   esac
 done
+
+# Auto-detect local mode if no compose file specified and no container found
+if ! $LOCAL_MODE && [[ -z "$COMPOSE_FILE" ]]; then
+  if ! docker compose ps -q "$SERVICE" &>/dev/null 2>&1 && \
+     ! docker compose -f docker-compose.prod.yml ps -q "$SERVICE" &>/dev/null 2>&1; then
+    # No Docker containers found — check if we have server/cli.js locally
+    if [[ -f "server/cli.js" ]]; then
+      LOCAL_MODE=true
+    fi
+  fi
+fi
 
 detect_compose_file
 init_term

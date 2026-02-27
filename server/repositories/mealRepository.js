@@ -29,11 +29,15 @@ export function remove(id) {
   return result.changes > 0
 }
 
+function formatDateLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 export function recentNames(days = 30) {
   const db = getDb()
   const since = new Date()
   since.setDate(since.getDate() - days)
-  const sinceStr = since.toISOString().split('T')[0]
+  const sinceStr = formatDateLocal(since)
   return db.prepare(`
     SELECT meal_name FROM meals WHERE date >= ?
     GROUP BY meal_name COLLATE NOCASE
