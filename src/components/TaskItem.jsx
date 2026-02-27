@@ -255,7 +255,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
         className={`task-card group ${isCompleted ? 'opacity-60' : ''}`}
         style={{
           borderLeftWidth: '3px',
-          borderLeftStyle: task.schedule_id ? 'dashed' : 'solid',
+          borderLeftStyle: 'solid',
           borderLeftColor: task.is_both ? '#e5e7eb' : config.border.replace('border-', ''),
           transform: `translateX(${swipeX}px)`,
           transition: isDragging ? 'none' : 'transform 0.3s ease-out'
