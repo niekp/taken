@@ -1,5 +1,39 @@
 const BASE_URL = 'https://api.getbring.com/rest'
 const API_KEY = 'cof4Nc6D8saplXjE3h3HXqHH8m7VU2i1Gs0g85Sp'
+const CATALOG_URL = 'https://web.getbring.com/locale/articles'
+
+// In-memory translation cache: locale -> { deToLocale: Map, localeToDe: Map, fetchedAt: number }
+const translationCache = {}
+const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
+
+async function loadTranslations(locale) {
+  const cached = translationCache[locale]
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
+    return cached
+  }
+
+  try {
+    const res = await fetch(`${CATALOG_URL}.${locale}.json`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+
+    const deToLocale = new Map()
+    const localeToDe = new Map()
+
+    for (const [de, localized] of Object.entries(data)) {
+      deToLocale.set(de, localized)
+      // For reverse lookup, use lowercase key to handle case-insensitive matching
+      localeToDe.set(localized.toLowerCase(), de)
+    }
+
+    translationCache[locale] = { deToLocale, localeToDe, fetchedAt: Date.now() }
+    return translationCache[locale]
+  } catch (err) {
+    console.error(`Failed to load Bring! translations for ${locale}:`, err.message)
+    // Return empty maps so items show as-is
+    return { deToLocale: new Map(), localeToDe: new Map() }
+  }
+}
 
 export class BringClient {
   constructor({ email, password, uuid, publicUuid, accessToken, refreshToken, expiresAt, country }) {
@@ -148,20 +182,57 @@ export class BringClient {
     return data.lists || []
   }
 
+  get locale() {
+    // Map country to Bring! locale
+    const countryToLocale = {
+      'NL': 'nl-NL', 'BE': 'nl-NL', 'DE': 'de-DE', 'AT': 'de-AT', 'CH': 'de-CH',
+      'US': 'en-US', 'GB': 'en-GB', 'AU': 'en-AU', 'CA': 'en-CA',
+      'FR': 'fr-FR', 'IT': 'it-IT', 'ES': 'es-ES', 'PT': 'pt-BR',
+      'NO': 'nb-NO', 'SE': 'sv-SE', 'PL': 'pl-PL', 'HU': 'hu-HU',
+      'RU': 'ru-RU', 'TR': 'tr-TR',
+    }
+    return countryToLocale[this.country] || 'nl-NL'
+  }
+
+  async _getTranslations() {
+    return loadTranslations(this.locale)
+  }
+
+  _translateToLocale(itemId, translations) {
+    return translations.deToLocale.get(itemId) || itemId
+  }
+
+  _translateFromLocale(localizedName, translations) {
+    // Try exact match (case-insensitive) first
+    const de = translations.localeToDe.get(localizedName.toLowerCase())
+    return de || localizedName
+  }
+
   async getItems(listUuid) {
     const data = await this._request('GET', `/v2/bringlists/${listUuid}`)
-    return {
-      purchase: data.items?.purchase || [],
-      recently: data.items?.recently || [],
-    }
+    const translations = await this._getTranslations()
+
+    const purchase = (data.items?.purchase || []).map(item => ({
+      ...item,
+      itemId: this._translateToLocale(item.itemId, translations),
+    }))
+    const recently = (data.items?.recently || []).map(item => ({
+      ...item,
+      itemId: this._translateToLocale(item.itemId, translations),
+    }))
+
+    return { purchase, recently }
   }
 
   async addItem(listUuid, itemName, specification = '') {
+    const translations = await this._getTranslations()
+    const deItemName = this._translateFromLocale(itemName, translations)
+
     const uuid = crypto.randomUUID()
     return this._request('PUT', `/v2/bringlists/${listUuid}/items`, {
       json: {
         changes: [{
-          itemId: itemName,
+          itemId: deItemName,
           spec: specification,
           uuid,
           operation: 'TO_PURCHASE',
@@ -176,10 +247,13 @@ export class BringClient {
   }
 
   async completeItem(listUuid, itemName, itemUuid) {
+    const translations = await this._getTranslations()
+    const deItemName = this._translateFromLocale(itemName, translations)
+
     return this._request('PUT', `/v2/bringlists/${listUuid}/items`, {
       json: {
         changes: [{
-          itemId: itemName,
+          itemId: deItemName,
           spec: '',
           uuid: itemUuid,
           operation: 'TO_RECENTLY',
@@ -194,10 +268,13 @@ export class BringClient {
   }
 
   async removeItem(listUuid, itemName, itemUuid) {
+    const translations = await this._getTranslations()
+    const deItemName = this._translateFromLocale(itemName, translations)
+
     return this._request('PUT', `/v2/bringlists/${listUuid}/items`, {
       json: {
         changes: [{
-          itemId: itemName,
+          itemId: deItemName,
           spec: '',
           uuid: itemUuid,
           operation: 'REMOVE',
