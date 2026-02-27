@@ -1,9 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 
+const DAY_SHORT = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
+
+function formatDateISO(d) {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function BoodschappenView({ onOpenMenu }) {
   const [items, setItems] = useState([])
   const [recentItems, setRecentItems] = useState([])
+  const [meals, setMeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [inputValue, setInputValue] = useState('')
@@ -17,9 +27,13 @@ export default function BoodschappenView({ onOpenMenu }) {
 
   useEffect(() => {
     loadItems()
+    loadMeals()
 
     function handleVisibilityChange() {
-      if (!document.hidden) loadItems()
+      if (!document.hidden) {
+        loadItems()
+        loadMeals()
+      }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -36,6 +50,20 @@ export default function BoodschappenView({ onOpenMenu }) {
       setError('Kon boodschappenlijst niet laden')
     }
     setLoading(false)
+  }
+
+  async function loadMeals() {
+    try {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const end = new Date(today)
+      end.setDate(today.getDate() + 6)
+      const data = await api.getMeals(formatDateISO(today), formatDateISO(end))
+      setMeals(data || [])
+    } catch (err) {
+      // Meals are non-critical, just ignore errors
+      console.error('Failed to load meals:', err)
+    }
   }
 
   async function handleAdd() {
@@ -135,6 +163,31 @@ export default function BoodschappenView({ onOpenMenu }) {
         </div>
       ) : (
         <div className="px-4 py-4 pb-44 space-y-3">
+          {/* Upcoming meals - compact */}
+          {meals.length > 0 && (
+            <div className="bg-white/70 rounded-2xl shadow-card px-4 py-3">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Komende maaltijden</p>
+              <div className="space-y-1">
+                {meals.map(meal => {
+                  const mealDate = new Date(meal.date + 'T00:00:00')
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const isToday = formatDateISO(mealDate) === formatDateISO(today)
+                  return (
+                    <div key={meal.id} className="flex items-center gap-2 min-w-0">
+                      <span className={`text-xs font-semibold w-6 flex-shrink-0 ${isToday ? 'text-accent-mint' : 'text-gray-400'}`}>
+                        {isToday ? 'Nu' : DAY_SHORT[mealDate.getDay()]}
+                      </span>
+                      <span className={`text-sm truncate ${isToday ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
+                        {meal.meal_name}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Active shopping items */}
           {items.length === 0 && (
             <div className="text-center py-12">

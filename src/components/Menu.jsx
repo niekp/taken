@@ -263,6 +263,10 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
             </div>
             <span className="text-sm font-medium text-red-500">Uitloggen</span>
           </button>
+
+          <p className="text-center text-[11px] text-gray-300 pt-4">
+            v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '?'}
+          </p>
         </div>
       </div>
 

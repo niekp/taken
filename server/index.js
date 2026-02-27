@@ -25,9 +25,32 @@ app.use('/api', apiRouter)
 // Serve static frontend files
 const distPath = path.join(__dirname, '..', 'dist')
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath))
-  // SPA fallback
+  // Service worker and manifest must never be cached by the browser
+  app.get('/sw.js', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.setHeader('Content-Type', 'application/javascript')
+    res.sendFile(path.join(distPath, 'sw.js'))
+  })
+
+  app.get('/manifest.webmanifest', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.sendFile(path.join(distPath, 'manifest.webmanifest'))
+  })
+
+  // Hashed assets (in /assets/) can be cached forever
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }))
+
+  // Everything else (icons, etc.) with short cache
+  app.use(express.static(distPath, {
+    maxAge: '1h',
+  }))
+
+  // SPA fallback — index.html should always be re-validated
   app.get('*', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache')
     res.sendFile(path.join(distPath, 'index.html'))
   })
 }

@@ -1,7 +1,7 @@
 {
   "name": "divide-chores",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.5.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server/index.js",
-    "cli": "node server/cli.js"
+    "cli": "node server/cli.js",
+    "release": "bash release.sh"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",

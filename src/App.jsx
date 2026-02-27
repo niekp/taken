@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { api } from './lib/api'
 import Login from './components/Login'
 import WeekView from './components/WeekView'
@@ -28,6 +28,37 @@ export default function App() {
   })
   const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false)
   const [isRestoringSession, setIsRestoringSession] = useState(true)
+  const [swWaiting, setSwWaiting] = useState(null) // waiting SW registration
+
+  // Detect when a new service worker is waiting to activate
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+
+    navigator.serviceWorker.ready.then(registration => {
+      // Check if there's already a waiting worker
+      if (registration.waiting) {
+        setSwWaiting(registration)
+      }
+
+      // Listen for new workers that enter the waiting state
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing
+        if (!newWorker) return
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            setSwWaiting(registration)
+          }
+        })
+      })
+    })
+  }, [])
+
+  const handleUpdate = useCallback(() => {
+    if (swWaiting?.waiting) {
+      swWaiting.waiting.postMessage({ type: 'SKIP_WAITING' })
+      setSwWaiting(null)
+    }
+  }, [swWaiting])
 
   useEffect(() => {
     loadUsers()
@@ -116,14 +147,6 @@ export default function App() {
   async function handleLogout() {
     setCurrentUser(null)
     localStorage.removeItem('currentUserId')
-
-    // Unregister service worker so the next load gets a fresh one
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations()
-      for (const reg of registrations) {
-        await reg.unregister()
-      }
-    }
   }
 
   function handleComplete() {
@@ -148,6 +171,21 @@ export default function App() {
   return (
     <div className={`min-h-screen ${presentationMode ? 'fixed inset-0 z-50 bg-white' : ''}`}>
       {showConfetti && <Confetti />}
+
+      {/* Update available banner */}
+      {swWaiting && (
+        <div className="fixed top-0 left-0 right-0 z-[100] px-4 pt-[env(safe-area-inset-top)]">
+          <button
+            onClick={handleUpdate}
+            className="w-full mt-2 flex items-center justify-center gap-2 bg-accent-mint text-white text-sm font-medium px-4 py-3 rounded-2xl shadow-lg active:scale-[0.98] transition-transform"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Nieuwe versie beschikbaar — tik om te updaten
+          </button>
+        </div>
+      )}
       
       {view === 'weekly' ? (
         <WeekView 
