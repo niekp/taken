@@ -188,33 +188,33 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
         className="bg-white w-full max-w-sm ml-auto h-full shadow-soft-lg"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-800">Menu</h2>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800">Menu</h2>
+          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-gray-100 transition-colors">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <div className="p-5 space-y-6">
-          <div className="bg-gradient-to-br from-pastel-mint/50 to-pastel-lavender/30 rounded-2xl p-5">
-            <div className="flex items-center gap-4">
+        <div className="p-4 space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 52px)' }}>
+          <div className="bg-gradient-to-br from-pastel-mint/50 to-pastel-lavender/30 rounded-xl p-3">
+            <div className="flex items-center gap-3">
               <button 
                 onClick={() => fileInputRef.current?.click()}
-                className="relative group"
+                className="relative group flex-shrink-0"
               >
-                <div className="w-14 h-14 rounded-2xl bg-white shadow-soft flex items-center justify-center overflow-hidden">
+                <div className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center overflow-hidden">
                   {currentUser?.avatar_url ? (
                     <img src={currentUser.avatar_url} alt={currentUser.name} className="w-full h-full object-cover" />
                   ) : (
-                    <span className={`w-full h-full flex items-center justify-center text-lg font-semibold text-white ${getUserColor(currentUser).bg}`}>
+                    <span className={`w-full h-full flex items-center justify-center text-sm font-semibold text-white ${getUserColor(currentUser).bg}`}>
                       {currentUser?.name?.charAt(0) || '?'}
                     </span>
                   )}
                 </div>
-                <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
@@ -228,13 +228,13 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
                 className="hidden"
               />
               <div>
-                <p className="text-xs text-gray-500">Ingelogd als</p>
-                <p className="text-lg font-semibold text-gray-800">{currentUser?.name}</p>
+                <p className="text-[11px] text-gray-500">Ingelogd als</p>
+                <p className="text-base font-semibold text-gray-800">{currentUser?.name}</p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-0.5">
             {menuItems.map((item, index) => (
               <button
                 key={index}
@@ -242,26 +242,26 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
                   item.onClick()
                   if (item.closeOnClick) onClose()
                 }}
-                className="w-full p-4 rounded-2xl text-left flex items-center gap-4 hover:shadow-soft transition-all duration-200 active:bg-gray-50"
+                className="w-full py-2.5 px-3 rounded-xl text-left flex items-center gap-3 hover:shadow-soft transition-all duration-200 active:bg-gray-50"
               >
-                <div className={`w-10 h-10 rounded-xl ${item.iconBg} flex items-center justify-center text-gray-600`}>
+                <div className={`w-8 h-8 rounded-lg ${item.iconBg} flex items-center justify-center text-gray-600 flex-shrink-0`}>
                   {item.icon}
                 </div>
-                <span className={`font-medium ${item.textColor || 'text-gray-700'}`}>{item.label}</span>
+                <span className={`text-sm font-medium ${item.textColor || 'text-gray-700'}`}>{item.label}</span>
               </button>
             ))}
           </div>
 
           <button
             onClick={onLogout}
-            className="w-full p-4 rounded-2xl text-left flex items-center gap-4 hover:bg-red-50 transition-colors group"
+            className="w-full py-2.5 px-3 rounded-xl text-left flex items-center gap-3 hover:bg-red-50 transition-colors group"
           >
-            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-500 group-hover:bg-red-200 transition-colors">
+            <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500 group-hover:bg-red-200 transition-colors flex-shrink-0">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
             </div>
-            <span className="font-medium text-red-500">Uitloggen</span>
+            <span className="text-sm font-medium text-red-500">Uitloggen</span>
           </button>
         </div>
       </div>
