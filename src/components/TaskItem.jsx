@@ -213,14 +213,14 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
             closeSwipe()
           }
         }}
-        className={`absolute left-0 top-0 bottom-0 w-20 z-10 bg-amber-500 active:bg-amber-600 flex items-center justify-center transition-opacity duration-200 ${swipeX > 10 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`absolute left-0 top-0 bottom-0 w-20 z-10 bg-accent-lavender active:bg-pastel-lavender flex items-center justify-center transition-opacity duration-200 ${swipeX > 10 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         style={{ borderRadius: '0.75rem' }}
       >
         <div className="flex flex-col items-center gap-0.5">
           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <span className="text-white text-xs font-medium">Morgen</span>
+          <span className="text-white text-xs font-medium">Later</span>
         </div>
       </button>
       {/* Delete button (left swipe reveals right side) */}

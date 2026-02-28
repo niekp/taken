@@ -63,8 +63,9 @@ notifications.init()
 
 // Cron: every 15 minutes, check if any subscriptions need their daily notification
 cron.schedule('*/15 * * * *', () => {
-  const now = new Date()
-  const time = `${String(now.getHours()).padStart(2, '0')}:${String(Math.floor(now.getMinutes() / 15) * 15).padStart(2, '0')}`
+  const { hours, minutes } = notifications.getAmsterdamNow()
+  const roundedMinutes = Math.floor(minutes / 15) * 15
+  const time = `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`
   notifications.sendDailySummaries(time).catch(err => {
     console.error('Error sending daily summaries:', err)
   })

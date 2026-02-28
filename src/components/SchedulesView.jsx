@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import { useToast } from '../lib/toast'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 import ScheduleModal from './ScheduleModal'
 import Confetti from './Confetti'
@@ -12,6 +13,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
   const [editSchedule, setEditSchedule] = useState(null)
   const [showConfetti, setShowConfetti] = useState(false)
   const [filter, setFilter] = useState('all') // 'all' | 'postponed' | 'due' | 'upcoming'
+  const toast = useToast()
 
   useEffect(() => {
     loadSchedules()
@@ -116,6 +118,7 @@ export default function SchedulesView({ currentUser, users, onOpenMenu, presenta
       }
     } catch (err) {
       console.error('Failed to complete task:', err)
+      toast.error('Afvinken mislukt')
     }
   }
 

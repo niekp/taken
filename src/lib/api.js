@@ -84,8 +84,9 @@ export const api = {
     body: JSON.stringify({ assigned_to, is_both }),
   }),
 
-  postponeTask: (id) => request(`/tasks/${id}/postpone`, {
+  postponeTask: (id, date) => request(`/tasks/${id}/postpone`, {
     method: 'POST',
+    ...(date ? { body: JSON.stringify({ date }) } : {}),
   }),
 
   deleteTask: (id) => request(`/tasks/${id}`, {

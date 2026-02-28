@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import { useToast } from '../lib/toast'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 
 const PRESET_INTERVALS = [
@@ -31,6 +32,7 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const [showNewCategory, setShowNewCategory] = useState(false)
+  const toast = useToast()
 
   const isEditing = !!editSchedule
 
@@ -68,6 +70,7 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
           assigned_to: isBoth ? null : assignedTo,
           is_both: isBoth,
         })
+        toast.success('Schema bijgewerkt')
       } else {
         await api.createSchedule({
           title: title.trim(),
@@ -78,11 +81,13 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
           created_by: currentUser.id,
           start_date: startDate,
         })
+        toast.success('Schema toegevoegd')
       }
       onSaved()
       onClose()
     } catch (err) {
       console.error('Failed to save schedule:', err)
+      toast.error('Opslaan mislukt')
     }
 
     setLoading(false)
@@ -95,10 +100,12 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
     setLoading(true)
     try {
       await api.deleteSchedule(editSchedule.id)
+      toast.success('Schema verwijderd')
       onSaved()
       onClose()
     } catch (err) {
       console.error('Failed to delete schedule:', err)
+      toast.error('Verwijderen mislukt')
     }
     setLoading(false)
   }

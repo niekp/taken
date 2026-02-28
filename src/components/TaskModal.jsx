@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
+import { useToast } from '../lib/toast'
 
-export default function TaskModal({ date, dayName, onClose, users, currentUser, onTaskCreated, editTask }) {
+export default function TaskModal({ date, dayName, onClose, users, currentUser, onTaskCreated, editTask, onNavigateToDate }) {
   const [title, setTitle] = useState(editTask?.title || '')
   const [taskDate, setTaskDate] = useState(editTask?.date || date)
   const [assignedTo, setAssignedTo] = useState(() => {
@@ -11,6 +12,7 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
     return 'both'
   })
   const [loading, setLoading] = useState(false)
+  const toast = useToast()
 
   const isEditing = !!editTask
   const isScheduled = isEditing && !!editTask.schedule_id
@@ -36,6 +38,7 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
           assigned_to: taskAssignedTo,
           is_both: taskIsBoth,
         })
+        toast.success('Toewijzing opgeslagen')
       } else if (isEditing) {
         // One-off task: full edit
         await api.updateTask(editTask.id, {
@@ -44,6 +47,7 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
           assigned_to: taskAssignedTo,
           is_both: taskIsBoth,
         })
+        toast.success('Taak bijgewerkt')
       } else {
         // New task
         await api.createTask({
@@ -52,11 +56,17 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
           assigned_to: taskAssignedTo,
           is_both: taskIsBoth,
         })
+        // If the task was created for a different date, navigate there
+        if (taskDate !== date && onNavigateToDate) {
+          onNavigateToDate(taskDate)
+        }
+        toast.success('Taak toegevoegd')
       }
       onTaskCreated()
       onClose()
     } catch (err) {
       console.error('Failed to save task:', err)
+      toast.error('Opslaan mislukt')
     }
 
     setLoading(false)
@@ -70,10 +80,12 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
 
     try {
       await api.deleteTask(editTask.id)
+      toast.success('Taak verwijderd')
       onTaskCreated()
       onClose()
     } catch (err) {
       console.error('Failed to delete task:', err)
+      toast.error('Verwijderen mislukt')
     }
 
     setLoading(false)
@@ -136,7 +148,7 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Bijv. Stofzuigen"
                   className="input-field"
-                  autoFocus
+                  autoFocus={!isEditing}
                   required
                 />
               </div>

@@ -33,11 +33,36 @@ function formatDateLocal(d) {
 }
 
 /**
+ * Get the current time in Europe/Amsterdam timezone.
+ * Returns { hours, minutes, today } where today is YYYY-MM-DD string.
+ */
+export function getAmsterdamNow() {
+  const now = new Date()
+  const formatter = new Intl.DateTimeFormat('nl-NL', {
+    timeZone: 'Europe/Amsterdam',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = Object.fromEntries(
+    formatter.formatToParts(now).map(p => [p.type, p.value])
+  )
+  return {
+    hours: parseInt(parts.hour, 10),
+    minutes: parseInt(parts.minute, 10),
+    today: `${parts.year}-${parts.month}-${parts.day}`,
+  }
+}
+
+/**
  * Build the daily summary text for a user.
  * Format: "{n} taken vandaag" + optional ", vanavond eten we {x}"
  */
 export function buildSummary(userId) {
-  const today = formatDateLocal(new Date())
+  const { today } = getAmsterdamNow()
 
   // Get tasks for today assigned to this user or "samen" (is_both)
   const allTasks = taskRepo.findByDateRange(today, today)

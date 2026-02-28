@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { api } from '../lib/api'
+import { useToast } from '../lib/toast'
 import useLiveSync from '../hooks/useLiveSync'
 
 const DAY_SHORT = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
@@ -61,6 +62,7 @@ export default function GroceryView({ onOpenMenu }) {
   const inputRef = useRef(null)
   const specRef = useRef(null)
   const inputBarRef = useRef(null)
+  const toast = useToast()
 
   // Persist collapsed/expanded state
   useEffect(() => {
@@ -217,6 +219,7 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to add item:', err)
+        toast.error('Item toevoegen mislukt')
         // Remove ghost on failure
         setItems(prev => prev.filter(i => i.uuid !== ghostId))
       })
@@ -245,6 +248,7 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to complete item:', err)
+        toast.error('Afvinken mislukt')
         // Re-add on failure
         setItems(prev => [item, ...prev])
         setCompleting(prev => {
@@ -263,6 +267,7 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to remove item:', err)
+        toast.error('Verwijderen mislukt')
         setItems(prev => [item, ...prev])
       })
   }
@@ -277,6 +282,7 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to re-add item:', err)
+        toast.error('Opnieuw toevoegen mislukt')
         // Revert: move back to recent
         setItems(prev => prev.filter(i => i.uuid !== item.uuid))
         setRecentItems(prev => [item, ...prev])
@@ -323,6 +329,7 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to update item:', err)
+        toast.error('Bijwerken mislukt')
         // Revert on failure
         setItems(prev => prev.map(i =>
           i.uuid === item.uuid ? { ...i, specification: oldSpec } : i
@@ -542,10 +549,8 @@ export default function GroceryView({ onOpenMenu }) {
                   onClick={() => handleStartEdit(item)}
                 >
                   <p className={`font-medium text-sm ${item._ghost ? 'text-gray-400' : 'text-gray-800'}`}>{item.itemId}</p>
-                  {item.specification ? (
+                  {item.specification && (
                     <p className="text-gray-400 text-xs truncate">{item.specification}</p>
-                  ) : !item._ghost && (
-                    <p className="text-gray-300 text-xs">Tik om details toe te voegen</p>
                   )}
                 </div>
               )}

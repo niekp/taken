@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
+import { useToast } from '../lib/toast'
 import { getUserColor, getStatusColor } from '../lib/colors'
 import useLiveSync from '../hooks/useLiveSync'
 
@@ -38,6 +39,7 @@ export default function MealsView({ users, onOpenMenu, presentationMode, onToggl
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef(null)
   const autocompleteRef = useRef(null)
+  const toast = useToast()
 
   const days = getDays()
 
@@ -133,14 +135,17 @@ export default function MealsView({ users, onOpenMenu, presentationMode, onToggl
     try {
       if (editingMealId) {
         await api.updateMeal(editingMealId, { meal_name: inputValue.trim() })
+        toast.success('Maaltijd bijgewerkt')
       } else {
         await api.createMeal({ date: dateStr, meal_name: inputValue.trim() })
+        toast.success('Maaltijd toegevoegd')
       }
       cancelEditing()
       loadMeals()
       loadSuggestions()
     } catch (err) {
       console.error('Failed to save meal:', err)
+      toast.error('Opslaan mislukt')
     }
   }
 
@@ -148,8 +153,10 @@ export default function MealsView({ users, onOpenMenu, presentationMode, onToggl
     try {
       await api.deleteMeal(mealId)
       loadMeals()
+      toast.success('Maaltijd verwijderd')
     } catch (err) {
       console.error('Failed to delete meal:', err)
+      toast.error('Verwijderen mislukt')
     }
   }
 

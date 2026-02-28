@@ -43,7 +43,8 @@ export function postpone(req, res) {
   if (!existing) return res.status(404).json({ error: 'Task not found' })
   if (existing.completed_at) return res.status(400).json({ error: 'Cannot postpone a completed task' })
 
-  const task = taskRepo.postpone(req.params.id)
+  const targetDate = req.body?.date || null
+  const task = taskRepo.postpone(req.params.id, targetDate)
   broadcast('tasks')
   res.json(task)
 }

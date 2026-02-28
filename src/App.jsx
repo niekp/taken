@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from './lib/api'
+import { ToastProvider } from './lib/toast'
 import Login from './components/Login'
 import WeekView from './components/WeekView'
 import SchedulesView from './components/SchedulesView'
@@ -187,6 +188,7 @@ export default function App() {
   }
 
   return (
+    <ToastProvider>
     <div className={`min-h-screen ${presentationMode ? 'fixed inset-0 z-50 bg-white' : ''}`}>
       {showConfetti && <Confetti />}
 
@@ -355,5 +357,6 @@ export default function App() {
         />
       )}
     </div>
+    </ToastProvider>
   )
 }
