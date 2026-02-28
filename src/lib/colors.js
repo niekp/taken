@@ -97,3 +97,18 @@ export const BOTH_COLOR = {
   text: 'text-pastel-lavenderDark',
   dot: 'bg-pastel-lavenderDark',
 }
+
+/** Day status color palette — dark pastel bg with white text for good contrast */
+export const STATUS_COLORS = [
+  { key: 'mint',     bg: 'bg-pastel-mintDark',     text: 'text-white', swatch: 'bg-pastel-mintDark' },
+  { key: 'lavender', bg: 'bg-pastel-lavenderDark',  text: 'text-white', swatch: 'bg-pastel-lavenderDark' },
+  { key: 'peach',    bg: 'bg-pastel-peachDark',     text: 'text-white', swatch: 'bg-pastel-peachDark' },
+  { key: 'rose',     bg: 'bg-pastel-roseDark',      text: 'text-white', swatch: 'bg-pastel-roseDark' },
+  { key: 'sky',      bg: 'bg-pastel-skyDark',       text: 'text-white', swatch: 'bg-pastel-skyDark' },
+  { key: 'sage',     bg: 'bg-pastel-sageDark',      text: 'text-white', swatch: 'bg-pastel-sageDark' },
+  { key: 'lilac',    bg: 'bg-pastel-lilacDark',     text: 'text-white', swatch: 'bg-pastel-lilacDark' },
+]
+
+export function getStatusColor(colorKey) {
+  return STATUS_COLORS.find(c => c.key === colorKey) || STATUS_COLORS[0]
+}

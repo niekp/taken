@@ -2,26 +2,12 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../lib/api'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
-import { getUserColor } from '../lib/colors'
+import { getUserColor, STATUS_COLORS, getStatusColor } from '../lib/colors'
 import useLiveSync from '../hooks/useLiveSync'
 
 const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 const MONTH_NAMES = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
-
-const STATUS_COLORS = [
-  { key: 'mint',     bg: 'bg-pastel-mint',     text: 'text-pastel-mintDark',     dot: 'bg-pastel-mintDark' },
-  { key: 'lavender', bg: 'bg-pastel-lavender',  text: 'text-pastel-lavenderDark', dot: 'bg-pastel-lavenderDark' },
-  { key: 'peach',    bg: 'bg-pastel-peach',     text: 'text-pastel-peachDark',    dot: 'bg-pastel-peachDark' },
-  { key: 'rose',     bg: 'bg-pastel-rose',      text: 'text-pastel-roseDark',     dot: 'bg-pastel-roseDark' },
-  { key: 'sky',      bg: 'bg-pastel-sky',       text: 'text-pastel-skyDark',      dot: 'bg-pastel-skyDark' },
-  { key: 'sage',     bg: 'bg-pastel-sage',      text: 'text-pastel-sageDark',     dot: 'bg-pastel-sageDark' },
-  { key: 'lilac',    bg: 'bg-pastel-lilac',     text: 'text-pastel-lilacDark',    dot: 'bg-pastel-lilacDark' },
-]
-
-function getStatusColor(colorKey) {
-  return STATUS_COLORS.find(c => c.key === colorKey) || STATUS_COLORS[0]
-}
 
 export default function WeekView({ currentUser, users, onComplete, presentationMode, onTogglePresentation, onOpenMenu }) {
   const [tasks, setTasks] = useState([])
@@ -322,9 +308,10 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             <button
               key={s.id}
               onClick={compact ? undefined : () => setStatusForm({ date: dateStr, id: s.id, label: s.label, color: s.color })}
-              className={`flex items-center gap-1.5 ${compact ? 'px-2 py-1 rounded-lg' : 'px-2.5 py-1.5 rounded-xl shadow-card'} ${sc.bg} transition-colors ${compact ? '' : 'active:opacity-80'}`}
+              className={`flex items-center gap-1.5 ${compact ? 'bg-white/60 px-2 py-1 rounded-lg' : 'bg-white/70 shadow-card px-2.5 py-1.5 rounded-xl'} transition-colors ${compact ? '' : 'active:opacity-80'}`}
             >
-              <span className={`${compact ? 'text-[10px] max-w-[70px]' : 'text-xs max-w-[120px]'} font-medium truncate ${sc.text}`}>{s.label}</span>
+              <div className={`${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} rounded-full ${sc.swatch} flex-shrink-0`} />
+              <span className={`text-gray-500 truncate ${compact ? 'text-[10px] max-w-[70px]' : 'text-xs max-w-[120px]'}`}>{s.label}</span>
             </button>
           )
         })}
@@ -800,7 +787,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                 <button
                   key={c.key}
                   onClick={() => setStatusForm(f => ({ ...f, color: c.key }))}
-                  className={`w-7 h-7 rounded-full ${c.bg} transition-all ${
+                  className={`w-7 h-7 rounded-full ${c.swatch} transition-all ${
                     statusForm.color === c.key
                       ? 'ring-2 ring-offset-2 ring-gray-400 scale-110'
                       : 'hover:scale-105'
@@ -813,8 +800,9 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             {statusForm.label.trim() && (
               <div className="flex items-center gap-2 mb-5">
                 <span className="text-xs text-gray-400">Voorbeeld:</span>
-                <div className={`px-2.5 py-1.5 rounded-xl ${getStatusColor(statusForm.color).bg}`}>
-                  <span className={`text-xs font-medium ${getStatusColor(statusForm.color).text}`}>{statusForm.label.trim()}</span>
+                <div className="flex items-center gap-1.5 bg-white/70 shadow-card px-2.5 py-1.5 rounded-xl">
+                  <div className={`w-4 h-4 rounded-full ${getStatusColor(statusForm.color).swatch} flex-shrink-0`} />
+                  <span className="text-xs text-gray-500">{statusForm.label.trim()}</span>
                 </div>
               </div>
             )}

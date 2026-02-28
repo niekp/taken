@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
-import { getUserColor } from '../lib/colors'
+import { getUserColor, getStatusColor } from '../lib/colors'
 import useLiveSync from '../hooks/useLiveSync'
 
 const DAY_NAMES = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
@@ -28,6 +28,7 @@ function getDays() {
 export default function MealsView({ users, onOpenMenu, presentationMode, onTogglePresentation }) {
   const [meals, setMeals] = useState([])
   const [dailyEntries, setDailyEntries] = useState({})
+  const [dayStatuses, setDayStatuses] = useState({})
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingDate, setEditingDate] = useState(null)
@@ -58,12 +59,14 @@ export default function MealsView({ users, onOpenMenu, presentationMode, onToggl
     const from = formatDateISO(days[0])
     const to = formatDateISO(days[6])
     try {
-      const [data, entriesData] = await Promise.all([
+      const [data, entriesData, statusData] = await Promise.all([
         api.getMeals(from, to),
         api.getDailyScheduleEntries(from, to),
+        api.getDayStatuses(from, to),
       ])
       setMeals(data)
       setDailyEntries(entriesData || {})
+      setDayStatuses(statusData || {})
     } catch (err) {
       console.error('Failed to load meals:', err)
     }
@@ -82,6 +85,7 @@ export default function MealsView({ users, onOpenMenu, presentationMode, onToggl
   // Live sync: refetch when another client modifies meals or daily schedules
   useLiveSync('meals', () => { loadMeals(); loadSuggestions() })
   useLiveSync('daily-schedules', loadMeals)
+  useLiveSync('day-statuses', loadMeals)
 
   function getFilteredSuggestions() {
     const query = inputValue.trim().toLowerCase()
@@ -162,7 +166,8 @@ export default function MealsView({ users, onOpenMenu, presentationMode, onToggl
 
   function renderDailySchedulePills(dateStr) {
     const entries = getDailyEntriesForDate(dateStr)
-    if (entries.length === 0) return null
+    const statuses = dayStatuses[dateStr] || []
+    if (entries.length === 0 && statuses.length === 0) return null
 
     const byUser = {}
     entries.forEach(e => {
@@ -191,6 +196,15 @@ export default function MealsView({ users, onOpenMenu, presentationMode, onToggl
             <span className="text-xs text-gray-500 truncate max-w-[120px]">{labels.join(', ')}</span>
           </div>
         ))}
+        {statuses.map(s => {
+          const sc = getStatusColor(s.color)
+          return (
+            <div key={s.id} className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-xl">
+              <div className={`w-4 h-4 rounded-full ${sc.swatch} flex-shrink-0`} />
+              <span className="text-xs text-gray-500 truncate max-w-[120px]">{s.label}</span>
+            </div>
+          )
+        })}
       </div>
     )
   }
