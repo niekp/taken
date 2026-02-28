@@ -5,6 +5,7 @@ import * as taskController from './controllers/taskController.js'
 import * as mealController from './controllers/mealController.js'
 import * as bringController from './controllers/bringController.js'
 import * as dailyScheduleController from './controllers/dailyScheduleController.js'
+import * as dayStatusController from './controllers/dayStatusController.js'
 import * as pushController from './controllers/pushController.js'
 import { sseHandler, revisionHandler } from './lib/liveSync.js'
 
@@ -67,6 +68,12 @@ router.get('/daily-schedules', dailyScheduleController.list)
 router.post('/daily-schedules', dailyScheduleController.create)
 router.put('/daily-schedules/:id', dailyScheduleController.update)
 router.delete('/daily-schedules/:id', dailyScheduleController.remove)
+
+// Day statuses (static routes before parameterized)
+router.get('/day-statuses/entries', dayStatusController.entriesForRange)
+router.post('/day-statuses', dayStatusController.create)
+router.put('/day-statuses/:id', dayStatusController.update)
+router.delete('/day-statuses/:id', dayStatusController.remove)
 
 // Push notifications
 router.get('/push/vapid-key', pushController.vapidKey)

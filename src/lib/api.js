@@ -173,6 +173,24 @@ export const api = {
 
   getDailyScheduleLabels: () => request('/daily-schedules/labels'),
 
+  // Day statuses
+  getDayStatuses: (from, to) =>
+    request(`/day-statuses/entries?from=${from}&to=${to}`),
+
+  createDayStatus: (data) => request('/day-statuses', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  updateDayStatus: (id, data) => request(`/day-statuses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  deleteDayStatus: (id) => request(`/day-statuses/${id}`, {
+    method: 'DELETE',
+  }),
+
   // Push notifications
   getVapidKey: () => request('/push/vapid-key'),
 

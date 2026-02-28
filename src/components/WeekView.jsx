@@ -9,16 +9,32 @@ const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 const MONTH_NAMES = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
+const STATUS_COLORS = [
+  { key: 'mint',     bg: 'bg-pastel-mint',     text: 'text-pastel-mintDark',     dot: 'bg-pastel-mintDark' },
+  { key: 'lavender', bg: 'bg-pastel-lavender',  text: 'text-pastel-lavenderDark', dot: 'bg-pastel-lavenderDark' },
+  { key: 'peach',    bg: 'bg-pastel-peach',     text: 'text-pastel-peachDark',    dot: 'bg-pastel-peachDark' },
+  { key: 'rose',     bg: 'bg-pastel-rose',      text: 'text-pastel-roseDark',     dot: 'bg-pastel-roseDark' },
+  { key: 'sky',      bg: 'bg-pastel-sky',       text: 'text-pastel-skyDark',      dot: 'bg-pastel-skyDark' },
+  { key: 'sage',     bg: 'bg-pastel-sage',      text: 'text-pastel-sageDark',     dot: 'bg-pastel-sageDark' },
+  { key: 'lilac',    bg: 'bg-pastel-lilac',     text: 'text-pastel-lilacDark',    dot: 'bg-pastel-lilacDark' },
+]
+
+function getStatusColor(colorKey) {
+  return STATUS_COLORS.find(c => c.key === colorKey) || STATUS_COLORS[0]
+}
+
 export default function WeekView({ currentUser, users, onComplete, presentationMode, onTogglePresentation, onOpenMenu }) {
   const [tasks, setTasks] = useState([])
   const [ghosts, setGhosts] = useState([])
   const [meals, setMeals] = useState([])
   const [dailyEntries, setDailyEntries] = useState({})
+  const [dayStatuses, setDayStatuses] = useState({})
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [filter, setFilter] = useState('all')
   const [resetKey, setResetKey] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [statusForm, setStatusForm] = useState(null) // { date, id?, label?, color? }
 
   const dateBarRef = useRef(null)
   const selectedDateRef = useRef(null)
@@ -98,16 +114,18 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         await api.runHousekeeping()
       }
 
-      const [taskData, mealData, entriesData] = await Promise.all([
+      const [taskData, mealData, entriesData, statusData] = await Promise.all([
         api.getTasks(from, to),
         api.getMeals(from, to),
         api.getDailyScheduleEntries(from, to),
+        api.getDayStatuses(from, to),
       ])
 
       setTasks(taskData.tasks || [])
       setGhosts(taskData.ghosts || [])
       setMeals(mealData)
       setDailyEntries(entriesData || {})
+      setDayStatuses(statusData || {})
     } catch (err) {
       console.error('Failed to load data:', err)
     }
@@ -118,6 +136,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   useLiveSync('tasks', loadData)
   useLiveSync('meals', loadData)
   useLiveSync('daily-schedules', loadData)
+  useLiveSync('day-statuses', loadData)
 
   function getItemsForDay(dayIndex) {
     const dateStr = formatDateISO(weekDates[dayIndex])
@@ -210,8 +229,40 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     return dailyEntries[dateStr] || []
   }
 
+  function getDayStatusesForDay(dayIndex) {
+    const dateStr = formatDateISO(weekDates[dayIndex])
+    return dayStatuses[dateStr] || []
+  }
+
   function goToToday() {
     setSelectedDate(todayStr)
+  }
+
+  async function handleCreateStatus(date, label, color) {
+    try {
+      await api.createDayStatus({ date, label, color })
+      loadData()
+    } catch (err) {
+      console.error('Failed to create day status:', err)
+    }
+  }
+
+  async function handleUpdateStatus(id, label, color) {
+    try {
+      await api.updateDayStatus(id, { label, color })
+      loadData()
+    } catch (err) {
+      console.error('Failed to update day status:', err)
+    }
+  }
+
+  async function handleDeleteStatus(id) {
+    try {
+      await api.deleteDayStatus(id)
+      loadData()
+    } catch (err) {
+      console.error('Failed to delete day status:', err)
+    }
   }
 
   function getDayAbbr(d) {
@@ -222,7 +273,8 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
   function renderDayInfoCard(dayIndex, compact = false) {
     const entries = getDailyEntriesForDay(dayIndex)
     const meal = getMealForDay(dayIndex)
-    if (entries.length === 0 && !meal) return null
+    const statuses = getDayStatusesForDay(dayIndex)
+    const dateStr = formatDateISO(weekDates[dayIndex])
 
     // Group entries by user
     const byUser = {}
@@ -246,6 +298,8 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
       )
     }
 
+    const hasPills = userEntries.length > 0 || meal || statuses.length > 0
+
     return (
       <div className={`flex flex-wrap items-center gap-1.5 ${compact ? '' : 'gap-2'}`}>
         {userEntries.map(([name, { labels }]) => (
@@ -261,6 +315,29 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             </svg>
             <span className={`text-gray-500 truncate ${compact ? 'text-[10px] max-w-[70px]' : 'text-xs max-w-[120px]'}`}>{meal.meal_name}</span>
           </div>
+        )}
+        {statuses.map(s => {
+          const sc = getStatusColor(s.color)
+          return (
+            <button
+              key={s.id}
+              onClick={compact ? undefined : () => setStatusForm({ date: dateStr, id: s.id, label: s.label, color: s.color })}
+              className={`flex items-center gap-1.5 ${compact ? 'px-2 py-1 rounded-lg' : 'px-2.5 py-1.5 rounded-xl shadow-card'} ${sc.bg} transition-colors ${compact ? '' : 'active:opacity-80'}`}
+            >
+              <span className={`${compact ? 'text-[10px] max-w-[70px]' : 'text-xs max-w-[120px]'} font-medium truncate ${sc.text}`}>{s.label}</span>
+            </button>
+          )
+        })}
+        {!compact && (
+          <button
+            onClick={() => setStatusForm({ date: dateStr, id: null, label: '', color: 'mint' })}
+            className={`flex items-center justify-center ${hasPills ? 'w-7 h-7' : 'gap-1.5 px-2.5 py-1.5'} rounded-xl bg-white/50 hover:bg-white/80 text-gray-400 hover:text-gray-500 transition-colors`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            {!hasPills && <span className="text-xs">Status</span>}
+          </button>
         )}
       </div>
     )
@@ -438,7 +515,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                       ),
                       true
                     )}
-                    {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(selectedDayIndex) && getDailyEntriesForDay(selectedDayIndex).length === 0 && (
+                {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(selectedDayIndex) && getDailyEntriesForDay(selectedDayIndex).length === 0 && getDayStatusesForDay(selectedDayIndex).length === 0 && (
                       <div className="text-center text-gray-400 py-8">
                         Geen taken
                       </div>
@@ -663,6 +740,102 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
           onTaskCreated={loadData}
           editTask={editTask}
         />
+      )}
+
+      {statusForm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setStatusForm(null)}>
+          <div className="absolute inset-0 bg-black/20" />
+          <div
+            className="relative w-full max-w-md bg-white rounded-t-3xl p-5 pb-8 shadow-soft-lg"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-gray-800">
+                {statusForm.id ? 'Status bewerken' : 'Status toevoegen'}
+              </h3>
+              <div className="flex items-center gap-2">
+                {statusForm.id && (
+                  <button
+                    onClick={() => {
+                      handleDeleteStatus(statusForm.id)
+                      setStatusForm(null)
+                    }}
+                    className="p-2 rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+                <button onClick={() => setStatusForm(null)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <input
+              type="text"
+              value={statusForm.label}
+              onChange={e => setStatusForm(f => ({ ...f, label: e.target.value }))}
+              placeholder="bijv. Verjaardag, Laat thuis..."
+              autoFocus
+              className="w-full px-4 py-3 rounded-2xl bg-pastel-cream/50 border border-gray-100 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent-mint/30 focus:border-accent-mint/50 mb-4"
+              onKeyDown={e => {
+                if (e.key === 'Enter' && statusForm.label.trim()) {
+                  if (statusForm.id) {
+                    handleUpdateStatus(statusForm.id, statusForm.label.trim(), statusForm.color)
+                  } else {
+                    handleCreateStatus(statusForm.date, statusForm.label.trim(), statusForm.color)
+                  }
+                  setStatusForm(null)
+                }
+              }}
+            />
+
+            <div className="flex items-center gap-2 mb-5">
+              <span className="text-xs text-gray-400 mr-1">Kleur</span>
+              {STATUS_COLORS.map(c => (
+                <button
+                  key={c.key}
+                  onClick={() => setStatusForm(f => ({ ...f, color: c.key }))}
+                  className={`w-7 h-7 rounded-full ${c.bg} transition-all ${
+                    statusForm.color === c.key
+                      ? 'ring-2 ring-offset-2 ring-gray-400 scale-110'
+                      : 'hover:scale-105'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Preview */}
+            {statusForm.label.trim() && (
+              <div className="flex items-center gap-2 mb-5">
+                <span className="text-xs text-gray-400">Voorbeeld:</span>
+                <div className={`px-2.5 py-1.5 rounded-xl ${getStatusColor(statusForm.color).bg}`}>
+                  <span className={`text-xs font-medium ${getStatusColor(statusForm.color).text}`}>{statusForm.label.trim()}</span>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                if (!statusForm.label.trim()) return
+                if (statusForm.id) {
+                  handleUpdateStatus(statusForm.id, statusForm.label.trim(), statusForm.color)
+                } else {
+                  handleCreateStatus(statusForm.date, statusForm.label.trim(), statusForm.color)
+                }
+                setStatusForm(null)
+              }}
+              disabled={!statusForm.label.trim()}
+              className="w-full py-3 rounded-2xl bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white font-medium text-sm shadow-soft disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+            >
+              {statusForm.id ? 'Opslaan' : 'Toevoegen'}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
