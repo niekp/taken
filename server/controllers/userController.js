@@ -1,4 +1,5 @@
 import * as userRepo from '../repositories/userRepository.js'
+import * as sessionRepo from '../repositories/sessionRepository.js'
 
 const VALID_COLORS = ['blue', 'pink', 'green', 'purple', 'orange', 'red', 'teal', 'yellow']
 
@@ -15,7 +16,39 @@ export function login(req, res) {
     return res.status(401).json({ error: 'Invalid PIN' })
   }
 
-  res.json(users)
+  // For single-user match, create session immediately
+  // For multi-user match, return users without token — frontend will call select-user
+  if (users.length === 1) {
+    const session = sessionRepo.create(users[0].id)
+    return res.json({ users, token: session.token })
+  }
+
+  // Multiple users share this PIN — return users, token comes after selection
+  res.json({ users, token: null })
+}
+
+export function selectUser(req, res) {
+  const { pin, user_id } = req.body
+  if (!pin || !user_id) {
+    return res.status(400).json({ error: 'PIN and user_id are required' })
+  }
+
+  // Verify the PIN matches this user
+  const users = userRepo.findByPin(pin)
+  const user = users.find(u => u.id === user_id)
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid PIN for this user' })
+  }
+
+  const session = sessionRepo.create(user.id)
+  res.json({ user, token: session.token })
+}
+
+export function logout(req, res) {
+  if (req.sessionToken) {
+    sessionRepo.deleteByToken(req.sessionToken)
+  }
+  res.json({ success: true })
 }
 
 export function createUser(req, res) {
@@ -101,6 +134,8 @@ export function changePin(req, res) {
   if (user.pin !== currentPin) return res.status(401).json({ error: 'Current PIN is incorrect' })
 
   userRepo.updatePin(id, newPin)
+  // Invalidate all other sessions for this user (PIN changed)
+  sessionRepo.deleteByUserId(id)
   res.json({ success: true })
 }
 
@@ -116,5 +151,7 @@ export function resetPin(req, res) {
   if (!user) return res.status(404).json({ error: 'User not found' })
 
   userRepo.updatePin(id, newPin)
+  // Invalidate all sessions for this user (PIN was reset)
+  sessionRepo.deleteByUserId(id)
   res.json({ success: true })
 }

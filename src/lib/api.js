@@ -1,10 +1,50 @@
 const BASE = '/api'
 
+const TOKEN_KEY = 'sessionToken'
+
+// Callback invoked when a 401 response is received (session expired/invalid).
+// App.jsx sets this to trigger logout.
+let onUnauthorized = null
+
+export function setOnUnauthorized(callback) {
+  onUnauthorized = callback
+}
+
+export function getToken() {
+  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
+}
+
+export function setToken(token) {
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token)
+    } else {
+      localStorage.removeItem(TOKEN_KEY)
+    }
+  } catch {}
+}
+
 async function request(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...options.headers }
+
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers,
   })
+
+  if (res.status === 401 && onUnauthorized) {
+    // Don't trigger on login/select-user calls (they expect 401 for wrong PIN)
+    const isAuthRoute = path === '/auth/login' || path === '/auth/select-user'
+    if (!isAuthRoute) {
+      onUnauthorized()
+    }
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error || `Request failed: ${res.status}`)
@@ -13,13 +53,23 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  // Users
-  getUsers: () => request('/users'),
-
+  // Auth
   login: (pin) => request('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ pin }),
   }),
+
+  selectUser: (pin, userId) => request('/auth/select-user', {
+    method: 'POST',
+    body: JSON.stringify({ pin, user_id: userId }),
+  }),
+
+  logout: () => request('/auth/logout', {
+    method: 'POST',
+  }),
+
+  // Users
+  getUsers: () => request('/users'),
 
   createUser: (data) => request('/users', {
     method: 'POST',
@@ -215,5 +265,14 @@ export const api = {
   testPush: (userId) => request('/push/test', {
     method: 'POST',
     body: JSON.stringify({ user_id: userId }),
+  }),
+
+  // Calendar / Agenda
+  getCalendarStatus: () => request('/calendar/status'),
+
+  getCalendarEvents: (from) => request(`/calendar/events?from=${from}`),
+
+  syncCalendar: () => request('/calendar/sync', {
+    method: 'POST',
   }),
 }

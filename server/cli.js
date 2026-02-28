@@ -3,7 +3,9 @@
 import { initDb } from './db.js'
 import * as userRepo from './repositories/userRepository.js'
 import * as bringRepo from './repositories/bringRepository.js'
+import * as calendarRepo from './repositories/calendarRepository.js'
 import { BringClient } from './lib/bring.js'
+import { syncCalendar } from './lib/calendar.js'
 import fs from 'fs'
 import path from 'path'
 import readline from 'readline'
@@ -38,6 +40,12 @@ Bring! Commands:
   bring-status                        Show current Bring! configuration
   bring-remove                        Remove Bring! configuration
 
+Calendar Commands:
+  calendar-set-url <url> [name]       Set the iCal feed URL (Google Calendar secret address)
+  calendar-status                     Show current calendar configuration
+  calendar-remove                     Remove calendar configuration and events
+  calendar-sync                       Manually trigger a calendar sync
+
 Setup Commands:
   generate-vapid-keys                 Generate VAPID keys for push notifications
 
@@ -54,6 +62,9 @@ Examples:
   node server/cli.js bring-login "user@example.com" "password123"
   node server/cli.js bring-lists
   node server/cli.js bring-set-list "abc-123" "Boodschappen"
+  node server/cli.js calendar-set-url "https://calendar.google.com/calendar/ical/xxx/basic.ics"
+  node server/cli.js calendar-status
+  node server/cli.js calendar-sync
 `)
 }
 
@@ -344,6 +355,88 @@ async function main() {
 
       bringRepo.removeConfig()
       console.log('Bring! configuration removed.')
+      break
+    }
+
+    // ── Calendar Commands ───────────────────────────────────────────
+
+    case 'calendar-set-url': {
+      const url = args[1]
+      const name = args[2] || 'Google Agenda'
+      if (!url) {
+        console.error('Usage: calendar-set-url <ical-url> [name]')
+        process.exit(1)
+      }
+
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        console.error('Error: URL must start with http:// or https://')
+        process.exit(1)
+      }
+
+      calendarRepo.saveSettings({ ical_url: url, name })
+      console.log(`Calendar URL set: ${name}`)
+      console.log(`  URL: ${url.slice(0, 80)}${url.length > 80 ? '...' : ''}`)
+
+      // Trigger initial sync
+      console.log('\nSyncing calendar...')
+      try {
+        const result = await syncCalendar()
+        console.log(`Sync complete: ${result.synced} events stored`)
+      } catch (err) {
+        console.error(`Sync failed: ${err.message}`)
+        console.log('The URL is saved, sync will retry automatically every 30 minutes.')
+      }
+      break
+    }
+
+    case 'calendar-status': {
+      const settings = calendarRepo.getSettings()
+      if (!settings) {
+        console.log('Calendar is not configured.')
+      } else {
+        console.log('\nAgenda configuratie:')
+        console.log('-'.repeat(60))
+        console.log(`  Naam:         ${settings.name || 'Google Agenda'}`)
+        console.log(`  URL:          ${settings.ical_url?.slice(0, 60)}${(settings.ical_url?.length || 0) > 60 ? '...' : ''}`)
+        console.log(`  Laatste sync: ${settings.last_synced_at || '(nog niet gesynchroniseerd)'}`)
+        console.log('-'.repeat(60))
+      }
+      break
+    }
+
+    case 'calendar-remove': {
+      const settings = calendarRepo.getSettings()
+      if (!settings) {
+        console.log('Calendar is not configured.')
+        break
+      }
+
+      const answer = await prompt('Are you sure you want to remove calendar configuration and all events? (y/N) ')
+      if (answer.toLowerCase() !== 'y') {
+        console.log('Cancelled')
+        break
+      }
+
+      calendarRepo.removeSettings()
+      console.log('Calendar configuration and events removed.')
+      break
+    }
+
+    case 'calendar-sync': {
+      const settings = calendarRepo.getSettings()
+      if (!settings) {
+        console.error('Calendar is not configured. Use calendar-set-url first.')
+        process.exit(1)
+      }
+
+      console.log('Syncing calendar...')
+      try {
+        const result = await syncCalendar()
+        console.log(`Sync complete: ${result.synced} events stored`)
+      } catch (err) {
+        console.error(`Sync failed: ${err.message}`)
+        process.exit(1)
+      }
       break
     }
 

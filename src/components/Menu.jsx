@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { api } from '../lib/api'
 import { getUserColor } from '../lib/colors'
 
-export default function Menu({ onClose, onLogout, currentUser, presentationMode, onTogglePresentation, onUpdateUser, onOpenStats, onOpenDagschema, onOpenUserManagement, onOpenNotifications }) {
+export default function Menu({ onClose, onLogout, currentUser, presentationMode, onTogglePresentation, onUpdateUser, onOpenStats, onOpenDagschema, onOpenAgenda, onOpenUserManagement, onOpenNotifications }) {
   const [showHistory, setShowHistory] = useState(false)
   const [completedTasks, setCompletedTasks] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -106,6 +106,19 @@ export default function Menu({ onClose, onLogout, currentUser, presentationMode,
       iconBg: 'bg-pastel-sky',
       closeOnClick: true,
     },
+    ...(onOpenAgenda ? [{
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 11v4m0 0l-2-2m2 2l2-2" />
+        </svg>
+      ),
+      label: 'Agenda',
+      onClick: onOpenAgenda,
+      bg: 'bg-pastel-lavender/30',
+      iconBg: 'bg-pastel-lavender',
+      closeOnClick: true,
+    }] : []),
     {
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

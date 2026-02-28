@@ -22,8 +22,10 @@ export default function Login({ onLogin, onSelectUser, users }) {
     }
 
     if (matched.length === 1) {
-      onSelectUser(matched[0])
+      // Single-user match — App.jsx already set currentUser and token
+      // No action needed here, component will unmount
     } else {
+      // Multi-user match — show user picker
       setMatchedUsers(matched)
       setShowUserSelect(true)
     }
@@ -42,8 +44,10 @@ export default function Login({ onLogin, onSelectUser, users }) {
     setPin(pin.slice(0, -1))
   }
 
-  function handleSelectUser(user) {
-    onSelectUser(user)
+  async function handleSelectUser(user) {
+    setIsLoading(true)
+    await onSelectUser(user)
+    setIsLoading(false)
   }
 
   if (showUserSelect) {
@@ -65,7 +69,8 @@ export default function Login({ onLogin, onSelectUser, users }) {
               <button
                 key={user.id}
                 onClick={() => handleSelectUser(user)}
-                className={`w-full p-4 rounded-2xl text-base font-medium transition-all duration-300 active:scale-[0.98] shadow-soft hover:shadow-soft-lg ${getUserColor(user).bg} text-white ${getUserColor(user).bgHover}`}
+                disabled={isLoading}
+                className={`w-full p-4 rounded-2xl text-base font-medium transition-all duration-300 active:scale-[0.98] shadow-soft hover:shadow-soft-lg ${getUserColor(user).bg} text-white ${getUserColor(user).bgHover} ${isLoading ? 'opacity-50' : ''}`}
               >
                 <span className="flex items-center justify-center gap-2">
                   {user.avatar_url ? (

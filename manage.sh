@@ -771,6 +771,91 @@ bring_menu() {
   done
 }
 
+# ── Calendar / Agenda Actions ───────────────────────────────────────
+
+action_calendar_status() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Agenda Status${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+
+  local output
+  output=$(exec_cli calendar-status 2>&1) || true
+  show_output "Agenda Status" "$output"
+}
+
+action_calendar_set_url() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Agenda URL instellen${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+  echo -e "    ${C_DIM}Plak de 'Geheim adres in iCal-indeling' URL${C_RESET}"
+  echo -e "    ${C_DIM}van Google Agenda > Instellingen > Agenda.${C_RESET}"
+  echo
+
+  local url name
+  if ! input_text url "iCal URL"; then return; fi
+
+  echo
+  input_text name "Naam (optioneel, standaard: Google Agenda)" || name="Google Agenda"
+  [[ -z "$name" ]] && name="Google Agenda"
+
+  local output
+  output=$(exec_cli calendar-set-url "$url" "$name" 2>&1) || true
+  show_output "Resultaat" "$output"
+}
+
+action_calendar_sync() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Agenda Synchroniseren${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+  echo -e "    ${C_DIM}Synchroniseren...${C_RESET}"
+
+  local output
+  output=$(exec_cli calendar-sync 2>&1) || true
+  show_output "Resultaat" "$output"
+}
+
+action_calendar_remove() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}Agenda Configuratie verwijderen${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+
+  if confirm_action "Weet je zeker dat je de agenda configuratie en alle events wilt verwijderen?"; then
+    local output
+    if $LOCAL_MODE; then
+      output=$(echo "y" | node server/cli.js calendar-remove 2>&1) || true
+    else
+      output=$(echo "y" | dc exec -T "$SERVICE" node server/cli.js calendar-remove 2>&1) || true
+    fi
+    show_output "Resultaat" "$output"
+  fi
+}
+
+agenda_menu() {
+  while true; do
+    local choice
+    if ! menu_select choice "Agenda Instellingen" \
+      "Status bekijken|Huidige agenda configuratie" \
+      "URL instellen|iCal feed URL instellen" \
+      "Nu synchroniseren|Handmatig events ophalen" \
+      "Configuratie verwijderen|Agenda koppeling verwijderen"; then
+      return
+    fi
+
+    check_running || continue
+
+    case "$choice" in
+      0) action_calendar_status ;;
+      1) action_calendar_set_url ;;
+      2) action_calendar_sync ;;
+      3) action_calendar_remove ;;
+    esac
+  done
+}
+
 # ── Notification Actions ────────────────────────────────────────────
 
 action_generate_vapid() {
@@ -808,7 +893,8 @@ main_menu() {
       if ! menu_select choice "Hoofdmenu" \
         "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
         "Bring! Instellingen|Boodschappenlijst koppelen" \
-        "Notificaties|Push notificaties instellen"; then
+        "Notificaties|Push notificaties instellen" \
+        "Agenda|Google Agenda koppelen"; then
         cleanup
         exit 0
       fi
@@ -817,12 +903,14 @@ main_menu() {
         0) user_menu ;;
         1) bring_menu ;;
         2) notification_menu ;;
+        3) agenda_menu ;;
       esac
     else
       if ! menu_select choice "Hoofdmenu" \
         "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
         "Bring! Instellingen|Boodschappenlijst koppelen" \
         "Notificaties|Push notificaties instellen" \
+        "Agenda|Google Agenda koppelen" \
         "Status|Container status bekijken" \
         "Logs bekijken|Live logboek volgen" \
         "Database backup|Maak een kopie van de database" \
@@ -836,11 +924,12 @@ main_menu() {
         0) user_menu ;;
         1) bring_menu ;;
         2) notification_menu ;;
-        3) action_status ;;
-        4) action_logs ;;
-        5) check_running && action_backup ;;
-        6) action_restart ;;
-        7) action_update ;;
+        3) agenda_menu ;;
+        4) action_status ;;
+        5) action_logs ;;
+        6) check_running && action_backup ;;
+        7) action_restart ;;
+        8) action_update ;;
       esac
     fi
   done

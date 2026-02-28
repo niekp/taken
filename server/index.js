@@ -6,6 +6,8 @@ import cron from 'node-cron'
 import { initDb } from './db.js'
 import apiRouter from './routes.js'
 import * as notifications from './lib/notifications.js'
+import { syncCalendar } from './lib/calendar.js'
+import * as sessionRepo from './repositories/sessionRepository.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -70,6 +72,25 @@ cron.schedule('*/15 * * * *', () => {
     console.error('Error sending daily summaries:', err)
   })
 })
+
+// Cron: every 30 minutes, sync calendar events from iCal feed
+cron.schedule('*/30 * * * *', () => {
+  syncCalendar().catch(err => {
+    console.error('Error syncing calendar:', err.message)
+  })
+})
+
+// Cron: daily at 3:00 AM, clean up expired sessions
+cron.schedule('0 3 * * *', () => {
+  try {
+    sessionRepo.deleteExpired()
+  } catch (err) {
+    console.error('Error cleaning up expired sessions:', err.message)
+  }
+})
+
+// Initial calendar sync on startup (non-blocking)
+syncCalendar().catch(() => {})
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Huishouden server running on port ${PORT}`)

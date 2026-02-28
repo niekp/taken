@@ -6,19 +6,31 @@ import * as mealController from './controllers/mealController.js'
 import * as bringController from './controllers/bringController.js'
 import * as dailyScheduleController from './controllers/dailyScheduleController.js'
 import * as dayStatusController from './controllers/dayStatusController.js'
+import * as calendarController from './controllers/calendarController.js'
 import * as pushController from './controllers/pushController.js'
 import { sseHandler, revisionHandler } from './lib/liveSync.js'
+import { requireAuth } from './middleware/auth.js'
 
 const router = Router()
 
-// Live sync
+// ── Public routes (no auth required) ────────────────────────────────
+router.post('/auth/login', userController.login)
+router.post('/auth/select-user', userController.selectUser)
+
+// Live sync — SSE and revision polling are public so clients can
+// connect before/during auth. They don't expose sensitive data.
 router.get('/events', sseHandler)
 router.get('/revision', revisionHandler)
+
+// ── Auth middleware — all routes below require a valid session ──────
+router.use(requireAuth)
+
+// Auth
+router.post('/auth/logout', userController.logout)
 
 // Users
 router.get('/users', userController.list)
 router.post('/users', userController.createUser)
-router.post('/auth/login', userController.login)
 router.patch('/users/:id', userController.updateUser)
 router.post('/users/:id/change-pin', userController.changePin)
 router.post('/users/:id/reset-pin', userController.resetPin)
@@ -74,6 +86,11 @@ router.get('/day-statuses/entries', dayStatusController.entriesForRange)
 router.post('/day-statuses', dayStatusController.create)
 router.put('/day-statuses/:id', dayStatusController.update)
 router.delete('/day-statuses/:id', dayStatusController.remove)
+
+// Calendar (iCal integration)
+router.get('/calendar/status', calendarController.status)
+router.get('/calendar/events', calendarController.events)
+router.post('/calendar/sync', calendarController.sync)
 
 // Push notifications
 router.get('/push/vapid-key', pushController.vapidKey)

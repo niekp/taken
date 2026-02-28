@@ -853,7 +853,7 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
             className="relative w-full max-w-md bg-white rounded-t-3xl p-5 pb-8 shadow-soft-lg"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-semibold text-gray-800">Verplaats naar</h3>
               <button onClick={() => setPostponeTarget(null)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -864,77 +864,68 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
             <p className="text-sm text-gray-500 mb-4 truncate">{postponeTarget.name}</p>
 
-            {/* Quick-pick buttons */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            {/* Scrollable date roll */}
+            <div
+              className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              ref={el => {
+                // Auto-scroll so "tomorrow" is visible near the start
+                if (el) el.scrollLeft = 0
+              }}
+            >
               {(() => {
                 const today = new Date(todayStr + 'T12:00:00')
-                const tomorrow = new Date(today)
-                tomorrow.setDate(tomorrow.getDate() + 1)
-                const dayAfter = new Date(today)
-                dayAfter.setDate(dayAfter.getDate() + 2)
-                // Next Monday
-                const nextMon = new Date(today)
-                nextMon.setDate(nextMon.getDate() + ((8 - nextMon.getDay()) % 7 || 7))
-                // Next Saturday
-                const nextSat = new Date(today)
-                nextSat.setDate(nextSat.getDate() + ((13 - nextSat.getDay()) % 7 || 7))
+                const dates = []
+                for (let i = 0; i <= 60; i++) {
+                  const d = new Date(today)
+                  d.setDate(d.getDate() + i)
+                  dates.push(d)
+                }
+                return dates.map((d, i) => {
+                  const iso = formatDateISO(d)
+                  const isCurrent = iso === postponeTarget.date
+                  const prevDate = i > 0 ? dates[i - 1] : null
+                  const showMonth = !prevDate || prevDate.getMonth() !== d.getMonth()
+                  const dayAbbr = DAYS[(d.getDay() + 6) % 7]
+                  const isToday = i === 0
+                  const isTomorrow = i === 1
 
-                const fmt = (d) => formatDateISO(d)
-                const dayLabel = (d) => DAY_NAMES[(d.getDay() + 6) % 7]
-                const dateLabel = (d) => `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`
-
-                const options = [
-                  { date: fmt(tomorrow), label: 'Morgen', sub: dateLabel(tomorrow) },
-                  { date: fmt(dayAfter), label: 'Overmorgen', sub: dateLabel(dayAfter) },
-                  { date: fmt(nextMon), label: 'Maandag', sub: dateLabel(nextMon) },
-                  { date: fmt(nextSat), label: 'Zaterdag', sub: dateLabel(nextSat) },
-                ]
-                // Filter out options that are in the past or same as current task date
-                const filtered = options.filter(o => o.date > todayStr && o.date !== postponeTarget.date)
-                // Deduplicate by date
-                const seen = new Set()
-                const unique = filtered.filter(o => {
-                  if (seen.has(o.date)) return false
-                  seen.add(o.date)
-                  return true
+                  return (
+                    <button
+                      key={iso}
+                      onClick={() => {
+                        handlePostponeToDate(postponeTarget, iso)
+                        setPostponeTarget(null)
+                      }}
+                      className={`min-w-[56px] flex-shrink-0 snap-center py-3 rounded-2xl text-center transition-all duration-200 active:scale-[0.95] ${
+                        isCurrent
+                          ? 'bg-gray-200 text-gray-400'
+                          : isToday
+                            ? 'bg-white shadow-card text-gray-700'
+                            : 'bg-white/50 text-gray-500 hover:bg-accent-mint/10 hover:shadow-card'
+                      }`}
+                    >
+                      {isToday && (
+                        <p className="text-[9px] font-semibold uppercase tracking-wider mb-0.5 text-accent-mint">
+                          vandaag
+                        </p>
+                      )}
+                      {showMonth && !isToday && (
+                        <p className="text-[9px] font-semibold uppercase tracking-wider mb-0.5 text-gray-400">
+                          {MONTH_NAMES[d.getMonth()]}
+                        </p>
+                      )}
+                      {isTomorrow && !showMonth && (
+                        <p className="text-[9px] font-semibold uppercase tracking-wider mb-0.5 text-accent-mint">
+                          morgen
+                        </p>
+                      )}
+                      <p className={`text-xs ${showMonth || isToday || isTomorrow ? '' : 'mt-3'} opacity-70`}>{dayAbbr}</p>
+                      <p className="text-lg font-semibold mt-0.5">{d.getDate()}</p>
+                    </button>
+                  )
                 })
-
-                return unique.slice(0, 4).map(opt => (
-                  <button
-                    key={opt.date}
-                    onClick={() => {
-                      handlePostponeToDate(postponeTarget, opt.date)
-                      setPostponeTarget(null)
-                    }}
-                    className="flex flex-col items-center gap-0.5 py-3 px-2 rounded-2xl bg-pastel-cream/50 border border-gray-100 hover:border-accent-mint/40 hover:bg-accent-mint/5 active:scale-[0.97] transition-all"
-                  >
-                    <span className="text-sm font-medium text-gray-700">{opt.label}</span>
-                    <span className="text-xs text-gray-400">{opt.sub}</span>
-                  </button>
-                ))
               })()}
-            </div>
-
-            {/* Custom date picker */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 relative">
-                <input
-                  type="date"
-                  min={(() => {
-                    const tomorrow = new Date(todayStr + 'T12:00:00')
-                    tomorrow.setDate(tomorrow.getDate() + 1)
-                    return formatDateISO(tomorrow)
-                  })()}
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handlePostponeToDate(postponeTarget, e.target.value)
-                      setPostponeTarget(null)
-                    }
-                  }}
-                  className="w-full px-4 py-3 rounded-2xl bg-pastel-cream/50 border border-gray-100 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-accent-mint/30 focus:border-accent-mint/50"
-                />
-              </div>
             </div>
           </div>
         </div>

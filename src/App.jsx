@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { api } from './lib/api'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { api, setToken, getToken, setOnUnauthorized } from './lib/api'
 import { ToastProvider } from './lib/toast'
 import Login from './components/Login'
 import WeekView from './components/WeekView'
@@ -7,6 +7,7 @@ import SchedulesView from './components/SchedulesView'
 import MealsView from './components/MealsView'
 import GroceryView from './components/GroceryView'
 import DagschemaView from './components/DagschemaView'
+import AgendaView from './components/AgendaView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
 import Confetti from './components/Confetti'
@@ -19,7 +20,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     try {
       const saved = localStorage.getItem('activeTab')
-      if (saved && ['weekly', 'meals', 'schedules', 'grocery', 'dagschema'].includes(saved)) return saved
+      if (saved && ['weekly', 'meals', 'schedules', 'grocery', 'dagschema', 'agenda'].includes(saved)) return saved
     } catch {}
     return 'weekly'
   })
@@ -29,6 +30,7 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [bringEnabled, setBringEnabled] = useState(null) // null = not yet checked
+  const [calendarEnabled, setCalendarEnabled] = useState(null) // null = not yet checked
   const [presentationMode, setPresentationMode] = useState(() => {
     const params = new URLSearchParams(window.location.search)
     return params.get('mode') === 'presentation'
@@ -36,6 +38,18 @@ export default function App() {
   const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false)
   const [isRestoringSession, setIsRestoringSession] = useState(true)
   const [swWaiting, setSwWaiting] = useState(null) // waiting SW registration
+  // Temporarily hold PIN during multi-user selection flow
+  const pendingPinRef = useRef(null)
+
+  // Register onUnauthorized callback — force logout on 401
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      setCurrentUser(null)
+      setToken(null)
+      localStorage.removeItem('currentUserId')
+    })
+    return () => setOnUnauthorized(null)
+  }, [])
 
   // Detect when a new service worker is waiting to activate
   useEffect(() => {
@@ -67,25 +81,40 @@ export default function App() {
     }
   }, [swWaiting])
 
+  // Restore session on mount: validate stored token, then load app data
   useEffect(() => {
-    loadUsers()
-    checkBringStatus()
-  }, [])
+    async function restoreSession() {
+      const token = getToken()
+      const savedUserId = localStorage.getItem('currentUserId')
 
-  // Restore session from localStorage once users are loaded
-  useEffect(() => {
-    if (users.length === 0) return
-    const savedUserId = localStorage.getItem('currentUserId')
-    if (savedUserId && !currentUser) {
-      const user = users.find(u => String(u.id) === savedUserId)
-      if (user) {
-        setCurrentUser(user)
-      } else {
-        localStorage.removeItem('currentUserId')
+      if (token && savedUserId) {
+        try {
+          // Validate token by fetching users — will 401 if expired/invalid
+          const data = await api.getUsers()
+          setUsers(data)
+          const user = data.find(u => String(u.id) === savedUserId)
+          if (user) {
+            setCurrentUser(user)
+            // Token is valid — load remaining app data
+            checkBringStatus()
+            checkCalendarStatus()
+          } else {
+            // User no longer exists
+            setToken(null)
+            localStorage.removeItem('currentUserId')
+          }
+        } catch {
+          // Token invalid/expired — clear everything
+          setToken(null)
+          localStorage.removeItem('currentUserId')
+        }
       }
+
+      setIsRestoringSession(false)
     }
-    setIsRestoringSession(false)
-  }, [users])
+
+    restoreSession()
+  }, [])
 
   // If saved tab was 'grocery' but Bring is disabled, fall back to weekly
   useEffect(() => {
@@ -94,28 +123,32 @@ export default function App() {
     }
   }, [bringEnabled])
 
+  // If saved tab was 'agenda' but calendar is disabled, fall back to weekly
+  useEffect(() => {
+    if (view === 'agenda' && calendarEnabled === false) {
+      setView('weekly')
+    }
+  }, [calendarEnabled])
+
   // Persist active tab
   useEffect(() => {
     try { localStorage.setItem('activeTab', view) } catch {}
   }, [view])
 
+  // Presentation mode auto-login
   useEffect(() => {
-    if (presentationMode && users.length > 0) {
+    if (presentationMode && !currentUser && !isAutoLoggingIn && !isRestoringSession) {
       const params = new URLSearchParams(window.location.search)
       const pin = params.get('pin')
-      if (pin && !currentUser && !isAutoLoggingIn) {
+      if (pin) {
         setIsAutoLoggingIn(true)
-        handleLogin(pin).then(matched => {
+        handleLogin(pin).then(result => {
           setIsAutoLoggingIn(false)
-          if (matched && matched.length > 0) {
-            if (matched.length === 1) {
-              setCurrentUser(matched[0])
-            }
-          }
+          // Single-user match is handled inside handleLogin already
         })
       }
     }
-  }, [presentationMode, users, currentUser])
+  }, [presentationMode, currentUser, isRestoringSession])
 
   async function loadUsers() {
     try {
@@ -135,35 +168,76 @@ export default function App() {
     }
   }
 
+  async function checkCalendarStatus() {
+    try {
+      const data = await api.getCalendarStatus()
+      setCalendarEnabled(data.configured)
+    } catch (err) {
+      setCalendarEnabled(false)
+    }
+  }
+
   async function handleLogin(pin) {
     try {
       const data = await api.login(pin)
-      if (data.length === 1) {
-        setCurrentUser(data[0])
-        localStorage.setItem('currentUserId', String(data[0].id))
+      const { users: matchedUsers, token } = data
+
+      if (matchedUsers.length === 1 && token) {
+        // Single-user match — session created server-side
+        setToken(token)
+        setCurrentUser(matchedUsers[0])
+        localStorage.setItem('currentUserId', String(matchedUsers[0].id))
+        // Load app data now that we're authenticated
+        loadUsers()
+        checkBringStatus()
+        checkCalendarStatus()
+        return matchedUsers
       }
-      return data
+
+      // Multi-user match — store PIN for selectUser call
+      pendingPinRef.current = pin
+      return matchedUsers
     } catch (err) {
       return null
     }
   }
 
-  function handleSelectUser(user) {
-    setCurrentUser(user)
-    localStorage.setItem('currentUserId', String(user.id))
+  async function handleSelectUser(user) {
+    const pin = pendingPinRef.current
+    pendingPinRef.current = null
+
+    if (!pin) {
+      console.error('No pending PIN for user selection')
+      return
+    }
+
+    try {
+      const data = await api.selectUser(pin, user.id)
+      setToken(data.token)
+      setCurrentUser(data.user)
+      localStorage.setItem('currentUserId', String(data.user.id))
+      // Load app data now that we're authenticated
+      loadUsers()
+      checkBringStatus()
+      checkCalendarStatus()
+    } catch (err) {
+      console.error('Failed to select user:', err)
+    }
   }
 
   async function handleUpdateUser(updates) {
     try {
       const data = await api.updateUser(currentUser.id, updates)
       setCurrentUser(data)
-      setUsers(users.map(u => u.id === data.id ? data : u))
+      setUsers(prev => prev.map(u => u.id === data.id ? data : u))
     } catch (err) {
       console.error('Failed to update user:', err)
     }
   }
 
   async function handleLogout() {
+    try { await api.logout() } catch {}
+    setToken(null)
     setCurrentUser(null)
     localStorage.removeItem('currentUserId')
   }
@@ -230,6 +304,10 @@ export default function App() {
       ) : view === 'dagschema' ? (
         <DagschemaView
           users={users}
+          onBack={() => setView('weekly')}
+        />
+      ) : view === 'agenda' ? (
+        <AgendaView
           onBack={() => setView('weekly')}
         />
       ) : (
@@ -311,6 +389,10 @@ export default function App() {
             setShowMenu(false)
             setView('dagschema')
           }}
+          onOpenAgenda={calendarEnabled ? () => {
+            setShowMenu(false)
+            setView('agenda')
+          } : undefined}
           onOpenUserManagement={() => {
             setShowMenu(false)
             setShowUserManagement(true)
@@ -333,17 +415,21 @@ export default function App() {
         <UserManagementView
           users={users}
           onUsersChanged={async () => {
-            const data = await api.getUsers()
-            setUsers(data)
-            // Update currentUser if still present
-            if (currentUser) {
-              const updated = data.find(u => u.id === currentUser.id)
-              if (updated) {
-                setCurrentUser(updated)
-              } else {
-                // Current user was deleted
-                handleLogout()
+            try {
+              const data = await api.getUsers()
+              setUsers(data)
+              // Update currentUser if still present
+              if (currentUser) {
+                const updated = data.find(u => u.id === currentUser.id)
+                if (updated) {
+                  setCurrentUser(updated)
+                } else {
+                  // Current user was deleted
+                  handleLogout()
+                }
               }
+            } catch (err) {
+              console.error('Failed to reload users:', err)
             }
           }}
           onClose={() => setShowUserManagement(false)}
