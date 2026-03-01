@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import { useToast } from '../lib/toast'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
+import useKeyboardOffset from '../hooks/useKeyboardOffset'
 
 const PRESET_INTERVALS = [
   { days: 1, label: 'Elke dag' },
@@ -33,6 +34,7 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
   const [categories, setCategories] = useState([])
   const [showNewCategory, setShowNewCategory] = useState(false)
   const toast = useToast()
+  const panelRef = useKeyboardOffset()
 
   const isEditing = !!editSchedule
 
@@ -116,7 +118,8 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
   return (
     <div className="fixed inset-0 bg-gray-900/30 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
       <div
-        className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-y-auto shadow-soft-lg"
+        ref={panelRef}
+        className="bg-white rounded-t-3xl w-full max-h-[90vh] max-h-[90dvh] overflow-y-auto shadow-soft-lg"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-5 border-b border-gray-100">

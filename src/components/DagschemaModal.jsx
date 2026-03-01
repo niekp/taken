@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import { getUserColor } from '../lib/colors'
+import useKeyboardOffset from '../hooks/useKeyboardOffset'
 
 const DAYS_OF_WEEK = [
   { value: 1, label: 'Maandag' },
@@ -36,6 +37,7 @@ export default function DagschemaModal({ onClose, users, editEntry, onSaved }) {
   const [showAutocomplete, setShowAutocomplete] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef(null)
+  const panelRef = useKeyboardOffset()
 
   const isEditing = !!editEntry
 
@@ -109,7 +111,8 @@ export default function DagschemaModal({ onClose, users, editEntry, onSaved }) {
   return (
     <div className="fixed inset-0 bg-gray-900/30 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
       <div
-        className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-y-auto shadow-soft-lg"
+        ref={panelRef}
+        className="bg-white rounded-t-3xl w-full max-h-[90vh] max-h-[90dvh] overflow-y-auto shadow-soft-lg"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-5 border-b border-gray-100">
