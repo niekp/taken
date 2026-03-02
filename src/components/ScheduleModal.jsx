@@ -38,9 +38,60 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
 
   const isEditing = !!editSchedule
 
+  // Reminder state (only relevant when editing)
+  const [reminderEnabled, setReminderEnabled] = useState(false)
+  const [reminderTime, setReminderTime] = useState('18:00')
+  const [reminderLoading, setReminderLoading] = useState(false)
+
   useEffect(() => {
     loadCategories()
+    if (editSchedule) {
+      loadReminder()
+    }
   }, [])
+
+  async function loadReminder() {
+    try {
+      const notifications = await api.getScheduleNotifications(editSchedule.id)
+      const mine = notifications.find(
+        n => n.user_id === currentUser.id && n.type === 'incomplete'
+      )
+      if (mine) {
+        setReminderEnabled(true)
+        setReminderTime(mine.time || '18:00')
+      }
+    } catch (err) {
+      console.error('Failed to load schedule notifications:', err)
+    }
+  }
+
+  async function handleReminderToggle(enabled) {
+    setReminderEnabled(enabled)
+    setReminderLoading(true)
+    try {
+      if (enabled) {
+        await api.setScheduleNotification(editSchedule.id, currentUser.id, 'incomplete', reminderTime)
+        toast.success('Herinnering ingesteld')
+      } else {
+        await api.removeScheduleNotification(editSchedule.id, currentUser.id, 'incomplete')
+        toast.success('Herinnering verwijderd')
+      }
+    } catch (err) {
+      setReminderEnabled(!enabled) // revert
+      toast.error('Instellen mislukt')
+    }
+    setReminderLoading(false)
+  }
+
+  async function handleReminderTimeChange(time) {
+    setReminderTime(time)
+    if (!reminderEnabled) return
+    try {
+      await api.setScheduleNotification(editSchedule.id, currentUser.id, 'incomplete', time)
+    } catch (err) {
+      toast.error('Tijd opslaan mislukt')
+    }
+  }
 
   useEffect(() => {
     if (!PRESET_INTERVALS.some(p => p.days === intervalDays)) {
@@ -326,6 +377,45 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
                 className="input-field"
               />
               <p className="text-xs text-gray-400 mt-1">De eerste taak wordt op deze datum aangemaakt</p>
+            </div>
+          )}
+
+          {/* Reminder (only when editing) */}
+          {isEditing && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-600">Herinnering</label>
+                <button
+                  type="button"
+                  disabled={reminderLoading}
+                  onClick={() => handleReminderToggle(!reminderEnabled)}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${
+                    reminderEnabled ? 'bg-accent-mint' : 'bg-gray-200'
+                  } ${reminderLoading ? 'opacity-50' : ''}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    reminderEnabled ? 'translate-x-5' : ''
+                  }`} />
+                </button>
+              </div>
+              {reminderEnabled && (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400">
+                    Stuur melding als de taak niet is afgerond om:
+                  </p>
+                  <select
+                    value={reminderTime}
+                    onChange={e => handleReminderTimeChange(e.target.value)}
+                    className="input-field w-full"
+                  >
+                    {Array.from({ length: 96 }, (_, i) => {
+                      const h = String(Math.floor(i / 4)).padStart(2, '0')
+                      const m = String((i % 4) * 15).padStart(2, '0')
+                      return <option key={i} value={`${h}:${m}`}>{h}:{m}</option>
+                    })}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 

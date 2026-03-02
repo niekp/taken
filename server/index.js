@@ -63,13 +63,16 @@ await initDb()
 // Initialize push notifications (no-op if VAPID keys not set)
 notifications.init()
 
-// Cron: every 15 minutes, check if any subscriptions need their daily notification
+// Cron: every 15 minutes, send daily summaries and schedule reminders
 cron.schedule('*/15 * * * *', () => {
   const { hours, minutes } = notifications.getAmsterdamNow()
   const roundedMinutes = Math.floor(minutes / 15) * 15
   const time = `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`
   notifications.sendDailySummaries(time).catch(err => {
     console.error('Error sending daily summaries:', err)
+  })
+  notifications.sendScheduleReminders(time).catch(err => {
+    console.error('Error sending schedule reminders:', err)
   })
 })
 

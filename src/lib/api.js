@@ -116,6 +116,18 @@ export const api = {
 
   getScheduleCategories: () => request('/schedules/categories'),
 
+  getScheduleNotifications: (id) => request(`/schedules/${id}/notifications`),
+
+  setScheduleNotification: (id, userId, type, time) => request(`/schedules/${id}/notifications`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, type, time }),
+  }),
+
+  removeScheduleNotification: (id, userId, type) => request(`/schedules/${id}/notifications`, {
+    method: 'DELETE',
+    body: JSON.stringify({ user_id: userId, type }),
+  }),
+
   // Tasks
   getTasks: (from, to) => request(`/tasks?from=${from}&to=${to}`),
 

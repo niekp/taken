@@ -2,6 +2,7 @@ import webpush from 'web-push'
 import * as pushRepo from '../repositories/pushRepository.js'
 import * as taskRepo from '../repositories/taskRepository.js'
 import * as mealRepo from '../repositories/mealRepository.js'
+import * as scheduleNotificationRepo from '../repositories/scheduleNotificationRepository.js'
 
 let configured = false
 
@@ -139,5 +140,41 @@ export async function sendDailySummaries(time) {
   for (const sub of subscriptions) {
     const summary = buildSummary(sub.user_id)
     await sendPush(sub, summary)
+  }
+}
+
+/**
+ * Send schedule reminder notifications for the given time slot.
+ * Finds schedules with an uncompleted task due today where a user
+ * has set a reminder at this time, and sends them a push.
+ */
+export async function sendScheduleReminders(time) {
+  if (!configured) return
+
+  const { today } = getAmsterdamNow()
+  const dueReminders = scheduleNotificationRepo.findDueIncomplete(time, today)
+  if (dueReminders.length === 0) return
+
+  console.log(`Sending ${dueReminders.length} schedule reminder(s) for ${time}`)
+
+  for (const reminder of dueReminders) {
+    const subscriptions = pushRepo.findByUserId(reminder.user_id)
+      .filter(s => s.enabled)
+
+    if (subscriptions.length === 0) continue
+
+    const titleParts = [reminder.schedule_title]
+    if (reminder.schedule_category) {
+      titleParts.unshift(reminder.schedule_category)
+    }
+
+    const payload = {
+      title: titleParts.join(': '),
+      body: 'Nog niet afgerond vandaag',
+    }
+
+    for (const sub of subscriptions) {
+      await sendPush(sub, payload)
+    }
   }
 }
