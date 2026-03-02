@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import { getUserColor } from '../lib/colors'
+import useLiveSync from '../hooks/useLiveSync'
 import DagschemaModal from './DagschemaModal'
 
 const DAY_NAMES = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
@@ -14,7 +15,16 @@ export default function DagschemaView({ users, onBack }) {
 
   useEffect(() => {
     loadEntries()
+
+    function handleVisibilityChange() {
+      if (!document.hidden) loadEntries()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
+
+  // Live sync: refetch when another client modifies daily schedules
+  useLiveSync('daily-schedules', loadEntries)
 
   async function loadEntries() {
     try {

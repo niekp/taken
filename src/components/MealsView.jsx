@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { api } from '../lib/api'
+import { api, isMutationQueued } from '../lib/api'
 import { useToast } from '../lib/toast'
 import { getUserColor, getStatusColor } from '../lib/colors'
 import useLiveSync from '../hooks/useLiveSync'
@@ -145,7 +145,12 @@ export default function MealsView({ users, onOpenMenu }) {
       loadSuggestions()
     } catch (err) {
       console.error('Failed to save meal:', err)
-      toast.error('Opslaan mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+        cancelEditing()
+      } else {
+        toast.error('Opslaan mislukt')
+      }
     }
   }
 
@@ -156,7 +161,11 @@ export default function MealsView({ users, onOpenMenu }) {
       toast.success('Maaltijd verwijderd')
     } catch (err) {
       console.error('Failed to delete meal:', err)
-      toast.error('Verwijderen mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Verwijderen mislukt')
+      }
     }
   }
 

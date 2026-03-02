@@ -1,6 +1,11 @@
+import { withOfflineSupport, clearCache as clearOfflineCache, MutationQueuedError } from './offlineSync.js'
+
 const BASE = '/api'
 
 const TOKEN_KEY = 'sessionToken'
+
+// Auth routes that should never use offline cache
+const NO_CACHE_PATHS = ['/auth/login', '/auth/select-user', '/auth/logout']
 
 // Callback invoked when a 401 response is received (session expired/invalid).
 // App.jsx sets this to trigger logout.
@@ -24,7 +29,10 @@ export function setToken(token) {
   } catch {}
 }
 
-async function request(path, options = {}) {
+/**
+ * Core fetch wrapper. Handles auth headers, 401 detection, JSON parsing.
+ */
+async function rawRequest(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers }
 
   const token = getToken()
@@ -50,6 +58,34 @@ async function request(path, options = {}) {
     throw new Error(body.error || `Request failed: ${res.status}`)
   }
   return res.json()
+}
+
+/**
+ * Request with offline support. GET requests are cached in IndexedDB
+ * and served from cache when offline. Auth routes bypass caching entirely.
+ */
+async function request(path, options = {}) {
+  // Auth routes: never cache, always go to network directly
+  if (NO_CACHE_PATHS.includes(path)) {
+    return rawRequest(path, options)
+  }
+
+  const url = `${BASE}${path}`
+  return withOfflineSupport(url, options, () => rawRequest(path, options))
+}
+
+/**
+ * Clear offline cache. Called on logout so the next user starts fresh.
+ */
+export { clearOfflineCache }
+
+/**
+ * Check if an error means the mutation was queued for background sync
+ * (offline but SW will retry). Callers should show an info toast instead
+ * of an error toast when this returns true.
+ */
+export function isMutationQueued(err) {
+  return err instanceof MutationQueuedError
 }
 
 export const api = {

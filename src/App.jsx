@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, setToken, getToken, setOnUnauthorized } from './lib/api'
+import { api, setToken, getToken, setOnUnauthorized, clearOfflineCache } from './lib/api'
 import { ToastProvider } from './lib/toast'
 import Login from './components/Login'
 import WeekView from './components/WeekView'
@@ -13,6 +13,7 @@ import Stats from './components/Stats'
 import Confetti from './components/Confetti'
 import UserManagementView from './components/UserManagementView'
 import NotificationSettings from './components/NotificationSettings'
+import OfflineBanner from './components/OfflineBanner'
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
@@ -220,6 +221,8 @@ export default function App() {
     setToken(null)
     setCurrentUser(null)
     localStorage.removeItem('currentUserId')
+    // Clear offline cache so the next user starts fresh
+    clearOfflineCache()
   }
 
   function handleComplete() {
@@ -245,6 +248,9 @@ export default function App() {
     <ToastProvider>
     <div className="min-h-screen">
       {showConfetti && <Confetti />}
+
+      {/* Offline / syncing indicator */}
+      <OfflineBanner />
 
       {/* Update available banner */}
       {swWaiting && (

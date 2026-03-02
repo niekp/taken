@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api } from '../lib/api'
+import { api, isMutationQueued } from '../lib/api'
 import { useToast } from '../lib/toast'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 import useKeyboardOffset from '../hooks/useKeyboardOffset'
@@ -78,8 +78,12 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
         toast.success('Herinnering verwijderd')
       }
     } catch (err) {
-      setReminderEnabled(!enabled) // revert
-      toast.error('Instellen mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        setReminderEnabled(!enabled) // revert
+        toast.error('Instellen mislukt')
+      }
     }
     setReminderLoading(false)
   }
@@ -90,7 +94,11 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
     try {
       await api.setScheduleNotification(editSchedule.id, currentUser.id, 'incomplete', time)
     } catch (err) {
-      toast.error('Tijd opslaan mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Tijd opslaan mislukt')
+      }
     }
   }
 
@@ -143,7 +151,12 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
       onClose()
     } catch (err) {
       console.error('Failed to save schedule:', err)
-      toast.error('Opslaan mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+        onClose()
+      } else {
+        toast.error('Opslaan mislukt')
+      }
     }
 
     setLoading(false)
@@ -161,7 +174,12 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
       onClose()
     } catch (err) {
       console.error('Failed to delete schedule:', err)
-      toast.error('Verwijderen mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+        onClose()
+      } else {
+        toast.error('Verwijderen mislukt')
+      }
     }
     setLoading(false)
   }

@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { api } from '../lib/api'
+import { api, isMutationQueued } from '../lib/api'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 import { useToast } from '../lib/toast'
 import useKeyboardOffset from '../hooks/useKeyboardOffset'
 
-export default function TaskModal({ date, dayName, onClose, users, currentUser, onTaskCreated, editTask, onNavigateToDate }) {
+export default function TaskModal({ date, dayName, onClose, users, currentUser, onTaskCreated, onTaskQueued, editTask, onNavigateToDate }) {
   const [title, setTitle] = useState(editTask?.title || '')
   const [notes, setNotes] = useState(editTask?.notes || '')
   const [taskDate, setTaskDate] = useState(editTask?.date || date)
@@ -72,7 +72,25 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
       onClose()
     } catch (err) {
       console.error('Failed to save task:', err)
-      toast.error('Opslaan mislukt')
+      if (isMutationQueued(err)) {
+        // Build the optimistic task data for WeekView to display
+        if (onTaskQueued) {
+          const optimisticData = {
+            title: isScheduled ? editTask.title : title.trim(),
+            date: isScheduled ? editTask.date : taskDate,
+            assigned_to: taskAssignedTo,
+            is_both: taskIsBoth,
+            notes: notes.trim() || null,
+            category: editTask?.category || null,
+            schedule_id: editTask?.schedule_id || null,
+          }
+          onTaskQueued(optimisticData, isEditing ? editTask.id : null)
+        }
+        toast.info('Wordt gesynchroniseerd wanneer online')
+        onClose()
+      } else {
+        toast.error('Opslaan mislukt')
+      }
     }
 
     setLoading(false)
@@ -91,7 +109,12 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
       onClose()
     } catch (err) {
       console.error('Failed to delete task:', err)
-      toast.error('Verwijderen mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+        onClose()
+      } else {
+        toast.error('Verwijderen mislukt')
+      }
     }
 
     setLoading(false)

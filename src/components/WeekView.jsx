@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { api } from '../lib/api'
+import { api, isMutationQueued } from '../lib/api'
 import { useToast } from '../lib/toast'
+import { getStatus } from '../lib/offlineSync'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
 import { getUserColor, STATUS_COLORS, getStatusColor } from '../lib/colors'
@@ -24,6 +25,76 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
   const [statusForm, setStatusForm] = useState(null) // { date, id?, label?, color? }
   const [postponeTarget, setPostponeTarget] = useState(null) // task to postpone (opens date picker)
   const toast = useToast()
+
+  // ─── Optimistic offline state ──────────────────────────────────────────
+  // Persisted to localStorage so pending items survive page refresh.
+  // Cleared only when BG_SYNC_COMPLETE fires (pendingCount drops to 0).
+
+  const PENDING_STORAGE_KEY = 'offlinePendingState'
+
+  function loadPendingState() {
+    try {
+      const raw = localStorage.getItem(PENDING_STORAGE_KEY)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      return {
+        tasks: parsed.tasks || [],
+        completions: new Set(parsed.completions || []),
+        deletions: new Set(parsed.deletions || []),
+        edits: new Map(Object.entries(parsed.edits || {})),
+      }
+    } catch { return null }
+  }
+
+  function savePendingState(tasks, completions, deletions, edits) {
+    try {
+      const data = {
+        tasks,
+        completions: [...completions],
+        deletions: [...deletions],
+        edits: Object.fromEntries(edits),
+      }
+      localStorage.setItem(PENDING_STORAGE_KEY, JSON.stringify(data))
+    } catch {}
+  }
+
+  function clearPendingStorage() {
+    try { localStorage.removeItem(PENDING_STORAGE_KEY) } catch {}
+  }
+
+  // Load once on mount via a shared lazy ref
+  const initPending = useRef(null)
+  function getInitPending() {
+    if (initPending.current === null) {
+      initPending.current = loadPendingState() || { tasks: [], completions: new Set(), deletions: new Set(), edits: new Map() }
+    }
+    return initPending.current
+  }
+
+  const [pendingTasks, setPendingTasks] = useState(() => getInitPending().tasks)
+  const [pendingCompletions, setPendingCompletions] = useState(() => getInitPending().completions)
+  const [pendingDeletions, setPendingDeletions] = useState(() => getInitPending().deletions)
+  const [pendingEdits, setPendingEdits] = useState(() => getInitPending().edits)
+
+  // Persist whenever pending state changes
+  const pendingRef = useRef({ pendingTasks, pendingCompletions, pendingDeletions, pendingEdits })
+  useEffect(() => {
+    pendingRef.current = { pendingTasks, pendingCompletions, pendingDeletions, pendingEdits }
+    const hasPending = pendingTasks.length > 0 || pendingCompletions.size > 0 || pendingDeletions.size > 0 || pendingEdits.size > 0
+    if (hasPending) {
+      savePendingState(pendingTasks, pendingCompletions, pendingDeletions, pendingEdits)
+    } else {
+      clearPendingStorage()
+    }
+  }, [pendingTasks, pendingCompletions, pendingDeletions, pendingEdits])
+
+  function clearAllPendingState() {
+    setPendingTasks([])
+    setPendingCompletions(new Set())
+    setPendingDeletions(new Set())
+    setPendingEdits(new Map())
+    clearPendingStorage()
+  }
 
   const dateBarRef = useRef(null)
   const selectedDateRef = useRef(null)
@@ -98,9 +169,9 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
     const to = formatDateISO(weekDates[6])
 
     try {
-      // Run housekeeping on current week load
+      // Fire-and-forget housekeeping — never blocks data loading
       if (isCurrentWeek) {
-        await api.runHousekeeping()
+        api.runHousekeeping().catch(() => {})
       }
 
       const [taskData, mealData, entriesData, statusData] = await Promise.all([
@@ -115,6 +186,14 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
       setMeals(mealData)
       setDailyEntries(entriesData || {})
       setDayStatuses(statusData || {})
+
+      // Only clear optimistic state when all mutations have actually been
+      // synced. If there are still pending mutations in the SW queue,
+      // keep the optimistic items visible so the user sees them.
+      const { pendingCount } = getStatus()
+      if (pendingCount === 0) {
+        clearAllPendingState()
+      }
     } catch (err) {
       console.error('Failed to load data:', err)
     }
@@ -130,7 +209,24 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
   function getItemsForDay(dayIndex) {
     const dateStr = formatDateISO(weekDates[dayIndex])
 
-    let dayTasks = tasks.filter(t => t.date === dateStr)
+    // Start with real tasks, apply pending edits and filter out pending deletions
+    let dayTasks = tasks
+      .filter(t => t.date === dateStr && !pendingDeletions.has(t.id))
+      .map(t => {
+        // Apply pending edits (e.g. reassignment, notes change while offline)
+        const edits = pendingEdits.get(t.id)
+        const merged = edits ? { ...t, ...edits, is_pending_sync: true } : t
+        // Apply pending completions
+        if (pendingCompletions.has(t.id) && !merged.completed_at) {
+          return { ...merged, completed_at: 'pending', is_pending_sync: true }
+        }
+        return merged
+      })
+
+    // Add optimistic tasks created offline
+    const dayPending = pendingTasks.filter(t => t.date === dateStr)
+    dayTasks = [...dayTasks, ...dayPending]
+
     let dayGhosts = ghosts.filter(g => g.date === dateStr)
 
     // Apply user filter
@@ -187,7 +283,13 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
       )
     } catch (err) {
       console.error('Failed to complete task:', err)
-      toast.error('Afvinken mislukt')
+      if (isMutationQueued(err)) {
+        // Optimistic: show task as completed immediately
+        setPendingCompletions(prev => new Set([...prev, task.id]))
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Afvinken mislukt')
+      }
     }
   }
 
@@ -197,7 +299,11 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
       loadData()
     } catch (err) {
       console.error('Failed to uncomplete task:', err)
-      toast.error('Ongedaan maken mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Ongedaan maken mislukt')
+      }
     }
   }
 
@@ -226,7 +332,13 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
       )
     } catch (err) {
       console.error('Failed to delete task:', err)
-      toast.error('Verwijderen mislukt')
+      if (isMutationQueued(err)) {
+        // Optimistic: hide the task immediately
+        setPendingDeletions(prev => new Set([...prev, task.id]))
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Verwijderen mislukt')
+      }
     }
   }
 
@@ -241,7 +353,27 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
       toast.success('Taak verplaatst')
     } catch (err) {
       console.error('Failed to postpone task:', err)
-      toast.error('Verplaatsen mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Verplaatsen mislukt')
+      }
+    }
+  }
+
+  // Callback for TaskModal to inject optimistic task data when mutation is queued offline
+  function handleTaskQueued(taskData, editTaskId) {
+    if (editTaskId) {
+      // Editing existing task — store the pending edits
+      setPendingEdits(prev => new Map([...prev, [editTaskId, taskData]]))
+    } else {
+      // Creating new task — add as pending task with a temporary ID
+      const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+      setPendingTasks(prev => [...prev, {
+        ...taskData,
+        id: tempId,
+        is_pending_sync: true,
+      }])
     }
   }
 
@@ -275,7 +407,11 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
       toast.success('Status toegevoegd')
     } catch (err) {
       console.error('Failed to create day status:', err)
-      toast.error('Status toevoegen mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Status toevoegen mislukt')
+      }
     }
   }
 
@@ -286,7 +422,11 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
       toast.success('Status bijgewerkt')
     } catch (err) {
       console.error('Failed to update day status:', err)
-      toast.error('Status bijwerken mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Status bijwerken mislukt')
+      }
     }
   }
 
@@ -297,7 +437,11 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
       toast.success('Status verwijderd')
     } catch (err) {
       console.error('Failed to delete day status:', err)
-      toast.error('Status verwijderen mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Status verwijderen mislukt')
+      }
     }
   }
 
@@ -687,6 +831,7 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
           users={users}
           currentUser={currentUser}
           onTaskCreated={loadData}
+          onTaskQueued={handleTaskQueued}
           editTask={editTask}
           onNavigateToDate={(d) => setSelectedDate(d)}
         />

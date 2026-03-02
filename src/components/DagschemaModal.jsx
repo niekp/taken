@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { api } from '../lib/api'
+import { api, isMutationQueued } from '../lib/api'
+import { useToast } from '../lib/toast'
 import { getUserColor } from '../lib/colors'
 import useKeyboardOffset from '../hooks/useKeyboardOffset'
 
@@ -27,6 +28,7 @@ function formatTodayISO() {
 }
 
 export default function DagschemaModal({ onClose, users, editEntry, onSaved }) {
+  const toast = useToast()
   const [userId, setUserId] = useState(editEntry?.user_id || (users[0]?.id ?? ''))
   const [dayOfWeek, setDayOfWeek] = useState(editEntry?.day_of_week ?? 1)
   const [label, setLabel] = useState(editEntry?.label || '')
@@ -89,6 +91,12 @@ export default function DagschemaModal({ onClose, users, editEntry, onSaved }) {
       onClose()
     } catch (err) {
       console.error('Failed to save daily schedule:', err)
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+        onClose()
+      } else {
+        toast.error('Opslaan mislukt')
+      }
     }
     setLoading(false)
   }
@@ -104,6 +112,12 @@ export default function DagschemaModal({ onClose, users, editEntry, onSaved }) {
       onClose()
     } catch (err) {
       console.error('Failed to delete daily schedule:', err)
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+        onClose()
+      } else {
+        toast.error('Verwijderen mislukt')
+      }
     }
     setLoading(false)
   }

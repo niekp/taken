@@ -4,6 +4,7 @@ import { getUserColor, BOTH_COLOR } from '../lib/colors'
 export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDelete, onDeleteAttempt, onPostpone, users, isToday, compact, resetKey, showCategory }) {
   const isCompleted = !!task.completed_at
   const isGhost = !!task.is_ghost
+  const isPendingSync = !!task.is_pending_sync
   const isOverdue = task.original_date && task.date !== task.original_date
 
   const assignedUser = users.find(u => u.id === task.assigned_to)
@@ -28,8 +29,8 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
   const swipeDirection = useRef(null)
   const actionTapped = useRef(false) // suppress parent click after action button tap
 
-  const canSwipeLeft = !isGhost && !isCompleted && !task.schedule_id && onDelete
-  const canSwipeRight = !isGhost && !isCompleted && onPostpone
+  const canSwipeLeft = !isGhost && !isCompleted && !isPendingSync && !task.schedule_id && onDelete
+  const canSwipeRight = !isGhost && !isCompleted && !isPendingSync && onPostpone
 
   useEffect(() => {
     setSwipeX(0)
@@ -126,26 +127,45 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
     )
   }
 
+  // Pending sync badge — shown on tasks that were created/edited/completed offline
+  const syncBadge = isPendingSync ? (
+    <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-accent-mint/10 text-accent-mint">
+      <svg className="w-2.5 h-2.5 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      Sync
+    </span>
+  ) : null
+
   // Compact mode for desktop columns — interactive but space-efficient
   if (compact) {
     return (
       <div
         onClick={() => {
-          if (!isCompleted && onEdit) onEdit(task)
+          if (!isCompleted && !isPendingSync && onEdit) onEdit(task)
         }}
-        className={`flex items-center gap-2 p-2 rounded-lg bg-white/80 hover:bg-white transition-all cursor-pointer group ${isCompleted ? 'opacity-50' : ''}`}
+        className={`flex items-center gap-2 p-2 rounded-lg bg-white/80 hover:bg-white transition-all cursor-pointer group ${isCompleted ? 'opacity-50' : ''} ${isPendingSync ? 'opacity-60' : ''}`}
+        style={isPendingSync ? { borderLeftWidth: '3px', borderLeftStyle: 'dashed', borderLeftColor: 'rgb(var(--color-accent-mint))' } : undefined}
       >
         <button
           onClick={(e) => {
             e.stopPropagation()
             e.preventDefault()
+            if (isPendingSync) return // Don't allow toggling pending sync items
             if (isCompleted) {
               onUncomplete?.()
             } else {
               onComplete?.()
             }
           }}
-          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${isCompleted ? 'bg-accent-mint border-accent-mint' : 'border-gray-300 hover:border-accent-mint bg-white'}`}
+          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+            isPendingSync && isCompleted
+              ? 'bg-accent-mint/50 border-accent-mint/50'
+              : isCompleted
+                ? 'bg-accent-mint border-accent-mint'
+                : 'border-gray-300 hover:border-accent-mint bg-white'
+          }`}
         >
           {isCompleted && (
             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,6 +186,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
               Uitgesteld
             </span>
           )}
+          {syncBadge}
           {task.notes && !isCompleted && (
             <p className="text-[10px] text-gray-400 mt-0.5 truncate">{task.notes}</p>
           )}
@@ -221,7 +242,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
           closeSwipe()
           return
         }
-        if (!isCompleted && onEdit) onEdit(task)
+        if (!isCompleted && !isPendingSync && onEdit) onEdit(task)
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -286,10 +307,10 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
         </svg>
       </button>
       <div
-        className={`task-card group ${isCompleted ? 'opacity-60' : ''}`}
+        className={`task-card group ${isCompleted ? 'opacity-60' : ''} ${isPendingSync ? 'opacity-60' : ''}`}
         style={{
           borderLeftWidth: '3px',
-          borderLeftStyle: 'solid',
+          borderLeftStyle: isPendingSync ? 'dashed' : 'solid',
           borderLeftColor: task.is_both ? '#e5e7eb' : config.border.replace('border-', ''),
           transform: `translateX(${swipeX}px)`,
           transition: isDragging ? 'none' : 'transform 0.3s ease-out'
@@ -300,6 +321,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
             onClick={(e) => {
               e.stopPropagation()
               e.preventDefault()
+              if (isPendingSync) return // Don't allow toggling pending sync items
               if (isCompleted) {
                 onUncomplete()
               } else {
@@ -307,9 +329,11 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
               }
             }}
             className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
-              isCompleted
-                ? 'bg-accent-mint border-accent-mint'
-                : 'border-gray-300 hover:border-accent-mint bg-white group-hover:shadow-soft'
+              isPendingSync && isCompleted
+                ? 'bg-accent-mint/50 border-accent-mint/50'
+                : isCompleted
+                  ? 'bg-accent-mint border-accent-mint'
+                  : 'border-gray-300 hover:border-accent-mint bg-white group-hover:shadow-soft'
             }`}
           >
             {isCompleted && (
@@ -355,13 +379,14 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
                   {completedByUser.name}
                 </span>
               )}
+              {syncBadge}
             </div>
             {task.notes && !isCompleted && (
               <p className="text-xs text-gray-400 mt-0.5 truncate">{task.notes}</p>
             )}
           </div>
 
-          {!isCompleted && (
+          {!isCompleted && !isPendingSync && (
             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
               {onPostpone && (
                 <button

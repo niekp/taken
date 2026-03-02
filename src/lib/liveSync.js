@@ -197,3 +197,12 @@ export function subscribe(channel, callback) {
     if (listeners.size === 0) stop()
   }
 }
+
+/**
+ * Force all subscribed views to refresh their data.
+ * Called by offlineSync when background sync completes as a safety net
+ * in case the SSE connection hasn't picked up the server broadcasts yet.
+ */
+export function refreshAll() {
+  notifyAllListeners()
+}

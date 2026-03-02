@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { api } from '../lib/api'
+import { api, isMutationQueued } from '../lib/api'
 import { useToast } from '../lib/toast'
 import { STATUS_COLORS, getStatusColor } from '../lib/colors'
+import useLiveSync from '../hooks/useLiveSync'
 
 const DAY_NAMES = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag']
 
@@ -49,7 +50,16 @@ export default function AgendaView({ onBack }) {
 
   useEffect(() => {
     loadEvents()
+
+    function handleVisibilityChange() {
+      if (!document.hidden) loadEvents()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
+
+  // Live sync: refetch when day statuses change (created from WeekView or other tabs)
+  useLiveSync('day-statuses', loadEvents)
 
   async function loadEvents() {
     try {
@@ -73,7 +83,11 @@ export default function AgendaView({ onBack }) {
       await loadEvents()
     } catch (err) {
       console.error('Calendar sync failed:', err)
-      toast.error('Synchronisatie mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Synchronisatie mislukt')
+      }
     }
     setSyncing(false)
   }
@@ -91,7 +105,12 @@ export default function AgendaView({ onBack }) {
       await loadEvents() // Refresh to show the new pill
     } catch (err) {
       console.error('Failed to create day status:', err)
-      toast.error('Status toevoegen mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+        setConvertForm(null)
+      } else {
+        toast.error('Status toevoegen mislukt')
+      }
     }
   }
 

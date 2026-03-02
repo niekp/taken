@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api } from '../lib/api'
+import { api, isMutationQueued } from '../lib/api'
 import { useToast } from '../lib/toast'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 import ScheduleModal from './ScheduleModal'
@@ -27,7 +27,8 @@ export default function SchedulesView({ currentUser, users, onOpenMenu }) {
 
   async function loadSchedules() {
     try {
-      await api.runHousekeeping()
+      // Fire-and-forget housekeeping — never blocks schedule loading
+      api.runHousekeeping().catch(() => {})
       const data = await api.getSchedules()
       setSchedules(data)
     } catch (err) {
@@ -118,7 +119,11 @@ export default function SchedulesView({ currentUser, users, onOpenMenu }) {
       }
     } catch (err) {
       console.error('Failed to complete task:', err)
-      toast.error('Afvinken mislukt')
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Afvinken mislukt')
+      }
     }
   }
 

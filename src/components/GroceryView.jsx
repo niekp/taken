@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { api } from '../lib/api'
+import { api, isMutationQueued } from '../lib/api'
 import { useToast } from '../lib/toast'
 import useLiveSync from '../hooks/useLiveSync'
 
@@ -219,9 +219,14 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to add item:', err)
-        toast.error('Item toevoegen mislukt')
-        // Remove ghost on failure
-        setItems(prev => prev.filter(i => i.uuid !== ghostId))
+        if (isMutationQueued(err)) {
+          // SW queued it — keep ghost, it will sync later
+          toast.info('Wordt gesynchroniseerd wanneer online')
+        } else {
+          toast.error('Item toevoegen mislukt')
+          // Remove ghost on failure
+          setItems(prev => prev.filter(i => i.uuid !== ghostId))
+        }
       })
   }, [inputValue, inputSpec])
 
@@ -248,14 +253,19 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to complete item:', err)
-        toast.error('Afvinken mislukt')
-        // Re-add on failure
-        setItems(prev => [item, ...prev])
-        setCompleting(prev => {
-          const next = { ...prev }
-          delete next[item.uuid]
-          return next
-        })
+        if (isMutationQueued(err)) {
+          // SW queued it — keep item removed, it will sync later
+          toast.info('Wordt gesynchroniseerd wanneer online')
+        } else {
+          toast.error('Afvinken mislukt')
+          // Re-add on failure
+          setItems(prev => [item, ...prev])
+          setCompleting(prev => {
+            const next = { ...prev }
+            delete next[item.uuid]
+            return next
+          })
+        }
       })
   }
 
@@ -267,8 +277,13 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to remove item:', err)
-        toast.error('Verwijderen mislukt')
-        setItems(prev => [item, ...prev])
+        if (isMutationQueued(err)) {
+          // SW queued it — keep item removed, it will sync later
+          toast.info('Wordt gesynchroniseerd wanneer online')
+        } else {
+          toast.error('Verwijderen mislukt')
+          setItems(prev => [item, ...prev])
+        }
       })
   }
 
@@ -282,10 +297,15 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to re-add item:', err)
-        toast.error('Opnieuw toevoegen mislukt')
-        // Revert: move back to recent
-        setItems(prev => prev.filter(i => i.uuid !== item.uuid))
-        setRecentItems(prev => [item, ...prev])
+        if (isMutationQueued(err)) {
+          // SW queued it — keep item in purchase list, it will sync later
+          toast.info('Wordt gesynchroniseerd wanneer online')
+        } else {
+          toast.error('Opnieuw toevoegen mislukt')
+          // Revert: move back to recent
+          setItems(prev => prev.filter(i => i.uuid !== item.uuid))
+          setRecentItems(prev => [item, ...prev])
+        }
       })
   }
 
@@ -329,11 +349,16 @@ export default function GroceryView({ onOpenMenu }) {
       .then(() => syncItems())
       .catch(err => {
         console.error('Failed to update item:', err)
-        toast.error('Bijwerken mislukt')
-        // Revert on failure
-        setItems(prev => prev.map(i =>
-          i.uuid === item.uuid ? { ...i, specification: oldSpec } : i
-        ))
+        if (isMutationQueued(err)) {
+          // SW queued it — keep optimistic spec change, it will sync later
+          toast.info('Wordt gesynchroniseerd wanneer online')
+        } else {
+          toast.error('Bijwerken mislukt')
+          // Revert on failure
+          setItems(prev => prev.map(i =>
+            i.uuid === item.uuid ? { ...i, specification: oldSpec } : i
+          ))
+        }
       })
   }
 
