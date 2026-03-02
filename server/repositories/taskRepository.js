@@ -55,13 +55,13 @@ export function findById(id) {
 /**
  * Create a one-off task (no schedule).
  */
-export function create({ title, date, assigned_to, is_both }) {
+export function create({ title, date, assigned_to, is_both, notes }) {
   const db = getDb()
   const id = generateId()
   db.prepare(`
-    INSERT INTO tasks (id, title, date, assigned_to, is_both)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, title, date, assigned_to || null, is_both ? 1 : 0)
+    INSERT INTO tasks (id, title, date, assigned_to, is_both, notes)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, title, date, assigned_to || null, is_both ? 1 : 0, notes || null)
   return findById(id)
 }
 
@@ -73,34 +73,41 @@ export function createTaskForSchedule(schedule, date) {
   const db = getDb()
   const id = generateId()
   db.prepare(`
-    INSERT INTO tasks (id, schedule_id, title, date, original_date, assigned_to, is_both, category)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, schedule.id, schedule.title, date, date, schedule.assigned_to || null, schedule.is_both ? 1 : 0, schedule.category || null)
+    INSERT INTO tasks (id, schedule_id, title, date, original_date, assigned_to, is_both, category, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, schedule.id, schedule.title, date, date, schedule.assigned_to || null, schedule.is_both ? 1 : 0, schedule.category || null, schedule.notes || null)
   return findById(id)
 }
 
 /**
- * Update a one-off task. Only allows updating title, date, assigned_to, is_both.
+ * Update a one-off task. Only allows updating title, date, assigned_to, is_both, notes.
  */
-export function update(id, { title, date, assigned_to, is_both }) {
+export function update(id, { title, date, assigned_to, is_both, notes }) {
   const db = getDb()
   db.prepare(`
-    UPDATE tasks SET title = ?, date = ?, assigned_to = ?, is_both = ?
+    UPDATE tasks SET title = ?, date = ?, assigned_to = ?, is_both = ?, notes = ?
     WHERE id = ? AND schedule_id IS NULL
-  `).run(title, date, assigned_to || null, is_both ? 1 : 0, id)
+  `).run(title, date, assigned_to || null, is_both ? 1 : 0, notes || null, id)
   return findById(id)
 }
 
 /**
  * Reassign a single task instance (works for both scheduled and one-off tasks).
- * Only updates assigned_to and is_both — does NOT change title or date.
+ * Updates assigned_to, is_both, and optionally notes.
  */
-export function reassign(id, { assigned_to, is_both }) {
+export function reassign(id, { assigned_to, is_both, notes }) {
   const db = getDb()
-  db.prepare(`
-    UPDATE tasks SET assigned_to = ?, is_both = ?
-    WHERE id = ? AND completed_at IS NULL
-  `).run(assigned_to || null, is_both ? 1 : 0, id)
+  if (notes !== undefined) {
+    db.prepare(`
+      UPDATE tasks SET assigned_to = ?, is_both = ?, notes = ?
+      WHERE id = ? AND completed_at IS NULL
+    `).run(assigned_to || null, is_both ? 1 : 0, notes || null, id)
+  } else {
+    db.prepare(`
+      UPDATE tasks SET assigned_to = ?, is_both = ?
+      WHERE id = ? AND completed_at IS NULL
+    `).run(assigned_to || null, is_both ? 1 : 0, id)
+  }
   return findById(id)
 }
 

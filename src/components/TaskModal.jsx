@@ -6,6 +6,7 @@ import useKeyboardOffset from '../hooks/useKeyboardOffset'
 
 export default function TaskModal({ date, dayName, onClose, users, currentUser, onTaskCreated, editTask, onNavigateToDate }) {
   const [title, setTitle] = useState(editTask?.title || '')
+  const [notes, setNotes] = useState(editTask?.notes || '')
   const [taskDate, setTaskDate] = useState(editTask?.date || date)
   const [assignedTo, setAssignedTo] = useState(() => {
     if (editTask?.is_both) return 'both'
@@ -35,12 +36,13 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
 
     try {
       if (isScheduled) {
-        // Scheduled task instance: only reassign
+        // Scheduled task instance: reassign + update notes
         await api.reassignTask(editTask.id, {
           assigned_to: taskAssignedTo,
           is_both: taskIsBoth,
+          notes: notes.trim() || null,
         })
-        toast.success('Toewijzing opgeslagen')
+        toast.success('Taak opgeslagen')
       } else if (isEditing) {
         // One-off task: full edit
         await api.updateTask(editTask.id, {
@@ -48,6 +50,7 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
           date: taskDate,
           assigned_to: taskAssignedTo,
           is_both: taskIsBoth,
+          notes: notes.trim() || null,
         })
         toast.success('Taak bijgewerkt')
       } else {
@@ -57,6 +60,7 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
           date: taskDate,
           assigned_to: taskAssignedTo,
           is_both: taskIsBoth,
+          notes: notes.trim() || null,
         })
         // If the task was created for a different date, navigate there
         if (taskDate !== date && onNavigateToDate) {
@@ -168,6 +172,18 @@ export default function TaskModal({ date, dayName, onClose, users, currentUser, 
               </div>
             </>
           )}
+
+          {/* Notes — available for all task types */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Notitie</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Optionele toelichting..."
+              className="input-field resize-none"
+              rows={2}
+            />
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-2">Toewijzen aan</label>

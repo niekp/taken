@@ -38,17 +38,17 @@ export function findById(id) {
 
 /**
  * Create a schedule and generate its first task.
- * @param {object} data - { title, category, interval_days, assigned_to, is_both, created_by, start_date }
+ * @param {object} data - { title, category, interval_days, assigned_to, is_both, created_by, start_date, notes }
  * @returns {object} The created schedule
  */
-export function create({ title, category, interval_days, assigned_to, is_both, created_by, start_date }) {
+export function create({ title, category, interval_days, assigned_to, is_both, created_by, start_date, notes }) {
   const db = getDb()
   const id = generateId()
 
   db.prepare(`
-    INSERT INTO schedules (id, title, category, interval_days, assigned_to, is_both, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, category || '', interval_days || 7, assigned_to || null, is_both ? 1 : 0, created_by || null)
+    INSERT INTO schedules (id, title, category, interval_days, assigned_to, is_both, created_by, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, category || '', interval_days || 7, assigned_to || null, is_both ? 1 : 0, created_by || null, notes || null)
 
   // Generate the first task on the given start_date (defaults to today)
   const date = start_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
@@ -58,18 +58,18 @@ export function create({ title, category, interval_days, assigned_to, is_both, c
   return findById(id)
 }
 
-export function update(id, { title, category, interval_days, assigned_to, is_both }) {
+export function update(id, { title, category, interval_days, assigned_to, is_both, notes }) {
   const db = getDb()
   db.prepare(`
-    UPDATE schedules SET title = ?, category = ?, interval_days = ?, assigned_to = ?, is_both = ?
+    UPDATE schedules SET title = ?, category = ?, interval_days = ?, assigned_to = ?, is_both = ?, notes = ?
     WHERE id = ?
-  `).run(title, category || '', interval_days || 7, assigned_to || null, is_both ? 1 : 0, id)
+  `).run(title, category || '', interval_days || 7, assigned_to || null, is_both ? 1 : 0, notes || null, id)
 
-  // Also update the title and category on any uncompleted tasks for this schedule
+  // Also update the title, category, and notes on any uncompleted tasks for this schedule
   db.prepare(`
-    UPDATE tasks SET title = ?, assigned_to = ?, is_both = ?, category = ?
+    UPDATE tasks SET title = ?, assigned_to = ?, is_both = ?, category = ?, notes = ?
     WHERE schedule_id = ? AND completed_at IS NULL
-  `).run(title, assigned_to || null, is_both ? 1 : 0, category || null, id)
+  `).run(title, assigned_to || null, is_both ? 1 : 0, category || null, notes || null, id)
 
   return findById(id)
 }

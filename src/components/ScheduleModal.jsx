@@ -18,6 +18,7 @@ const PRESET_INTERVALS = [
 
 export default function ScheduleModal({ onClose, currentUser, users, editSchedule, onSaved }) {
   const [title, setTitle] = useState(editSchedule?.title || '')
+  const [notes, setNotes] = useState(editSchedule?.notes || '')
   const [category, setCategory] = useState(editSchedule?.category || '')
   const [intervalDays, setIntervalDays] = useState(editSchedule?.interval_days || 7)
   const [customInterval, setCustomInterval] = useState(false)
@@ -122,6 +123,7 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
           interval_days: intervalDays,
           assigned_to: isBoth ? null : assignedTo,
           is_both: isBoth,
+          notes: notes.trim() || null,
         })
         toast.success('Schema bijgewerkt')
       } else {
@@ -133,6 +135,7 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
           is_both: isBoth,
           created_by: currentUser.id,
           start_date: startDate,
+          notes: notes.trim() || null,
         })
         toast.success('Schema toegevoegd')
       }
@@ -198,6 +201,18 @@ export default function ScheduleModal({ onClose, currentUser, users, editSchedul
               className="input-field"
               autoFocus
               required
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Notitie</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Optionele toelichting (wordt gekopieerd naar elke taak)..."
+              className="input-field resize-none"
+              rows={2}
             />
           </div>
 

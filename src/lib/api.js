@@ -141,9 +141,9 @@ export const api = {
     body: JSON.stringify(updates),
   }),
 
-  reassignTask: (id, { assigned_to, is_both }) => request(`/tasks/${id}/reassign`, {
+  reassignTask: (id, { assigned_to, is_both, notes }) => request(`/tasks/${id}/reassign`, {
     method: 'POST',
-    body: JSON.stringify({ assigned_to, is_both }),
+    body: JSON.stringify({ assigned_to, is_both, notes }),
   }),
 
   postponeTask: (id, date) => request(`/tasks/${id}/postpone`, {

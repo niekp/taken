@@ -31,11 +31,6 @@ export default function App() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [bringEnabled, setBringEnabled] = useState(null) // null = not yet checked
   const [calendarEnabled, setCalendarEnabled] = useState(null) // null = not yet checked
-  const [presentationMode, setPresentationMode] = useState(() => {
-    const params = new URLSearchParams(window.location.search)
-    return params.get('mode') === 'presentation'
-  })
-  const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false)
   const [isRestoringSession, setIsRestoringSession] = useState(true)
   const [swWaiting, setSwWaiting] = useState(null) // waiting SW registration
   // Temporarily hold PIN during multi-user selection flow
@@ -134,21 +129,6 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('activeTab', view) } catch {}
   }, [view])
-
-  // Presentation mode auto-login
-  useEffect(() => {
-    if (presentationMode && !currentUser && !isAutoLoggingIn && !isRestoringSession) {
-      const params = new URLSearchParams(window.location.search)
-      const pin = params.get('pin')
-      if (pin) {
-        setIsAutoLoggingIn(true)
-        handleLogin(pin).then(result => {
-          setIsAutoLoggingIn(false)
-          // Single-user match is handled inside handleLogin already
-        })
-      }
-    }
-  }, [presentationMode, currentUser, isRestoringSession])
 
   async function loadUsers() {
     try {
@@ -263,7 +243,7 @@ export default function App() {
 
   return (
     <ToastProvider>
-    <div className={`min-h-screen ${presentationMode ? 'fixed inset-0 z-50 bg-white' : ''}`}>
+    <div className="min-h-screen">
       {showConfetti && <Confetti />}
 
       {/* Update available banner */}
@@ -286,16 +266,12 @@ export default function App() {
           currentUser={currentUser}
           users={users}
           onComplete={handleComplete}
-          presentationMode={presentationMode}
-          onTogglePresentation={() => setPresentationMode(!presentationMode)}
           onOpenMenu={() => setShowMenu(true)}
         />
       ) : view === 'meals' ? (
         <MealsView
           users={users}
           onOpenMenu={() => setShowMenu(true)}
-          presentationMode={presentationMode}
-          onTogglePresentation={() => setPresentationMode(!presentationMode)}
         />
       ) : view === 'grocery' ? (
         <GroceryView
@@ -315,71 +291,65 @@ export default function App() {
           currentUser={currentUser}
           users={users}
           onOpenMenu={() => setShowMenu(true)}
-          presentationMode={presentationMode}
-          onTogglePresentation={() => setPresentationMode(!presentationMode)}
         />
       )}
 
-      {!presentationMode && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 glass border-t border-gray-200">
-          <div className="flex">
+      <div className="fixed bottom-0 left-0 right-0 z-30 glass border-t border-gray-200">
+        <div className="flex">
+          <button
+            onClick={() => setView('weekly')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
+              view === 'weekly' ? 'text-accent-mint' : 'text-gray-400'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-xs font-medium">Week</span>
+          </button>
+          <button
+            onClick={() => setView('meals')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
+              view === 'meals' ? 'text-accent-mint' : 'text-gray-400'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
+            </svg>
+            <span className="text-xs font-medium">Eten</span>
+          </button>
+          {bringEnabled && (
             <button
-              onClick={() => setView('weekly')}
+              onClick={() => setView('grocery')}
               className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-                view === 'weekly' ? 'text-accent-mint' : 'text-gray-400'
+                view === 'grocery' ? 'text-accent-mint' : 'text-gray-400'
               }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
               </svg>
-              <span className="text-xs font-medium">Week</span>
+              <span className="text-xs font-medium">Boodschappen</span>
             </button>
-            <button
-              onClick={() => setView('meals')}
-              className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-                view === 'meals' ? 'text-accent-mint' : 'text-gray-400'
-              }`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
-              </svg>
-              <span className="text-xs font-medium">Eten</span>
-            </button>
-            {bringEnabled && (
-              <button
-                onClick={() => setView('grocery')}
-                className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-                  view === 'grocery' ? 'text-accent-mint' : 'text-gray-400'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-                </svg>
-                <span className="text-xs font-medium">Boodschappen</span>
-              </button>
-            )}
-            <button
-              onClick={() => setView('schedules')}
-              className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-                view === 'schedules' ? 'text-accent-mint' : 'text-gray-400'
-              }`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span className="text-xs font-medium">Schema's</span>
-            </button>
-          </div>
+          )}
+          <button
+            onClick={() => setView('schedules')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
+              view === 'schedules' ? 'text-accent-mint' : 'text-gray-400'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="text-xs font-medium">Schema's</span>
+          </button>
         </div>
-      )}
+      </div>
 
       {showMenu && (
         <Menu 
           onClose={() => setShowMenu(false)}
           onLogout={handleLogout}
           currentUser={currentUser}
-          presentationMode={presentationMode}
-          onTogglePresentation={() => setPresentationMode(!presentationMode)}
           onUpdateUser={handleUpdateUser}
           onOpenStats={() => {
             setShowMenu(false)

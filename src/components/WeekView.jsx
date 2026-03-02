@@ -10,7 +10,7 @@ const DAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 const MONTH_NAMES = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
-export default function WeekView({ currentUser, users, onComplete, presentationMode, onTogglePresentation, onOpenMenu }) {
+export default function WeekView({ currentUser, users, onComplete, onOpenMenu }) {
   const [tasks, setTasks] = useState([])
   const [ghosts, setGhosts] = useState([])
   const [meals, setMeals] = useState([])
@@ -172,6 +172,19 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
       await api.completeTask(task.id, currentUser.id)
       onComplete()
       loadData()
+      // Show undo toast — tapping undo uncompletes the task
+      toast.undo(
+        `"${task.title}" afgerond`,
+        async () => {
+          try {
+            await api.uncompleteTask(task.id)
+            loadData()
+          } catch (err) {
+            console.error('Failed to undo complete:', err)
+            toast.error('Ongedaan maken mislukt')
+          }
+        }
+      )
     } catch (err) {
       console.error('Failed to complete task:', err)
       toast.error('Afvinken mislukt')
@@ -192,7 +205,25 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     try {
       await api.deleteTask(task.id)
       loadData()
-      toast.success('Taak verwijderd')
+      // Undo = re-create the task with its original data
+      toast.undo(
+        `"${task.title}" verwijderd`,
+        async () => {
+          try {
+            await api.createTask({
+              title: task.title,
+              date: task.date,
+              assigned_to: task.is_both ? null : task.assigned_to,
+              is_both: task.is_both,
+              notes: task.notes || null,
+            })
+            loadData()
+          } catch (err) {
+            console.error('Failed to undo delete:', err)
+            toast.error('Herstellen mislukt')
+          }
+        }
+      )
     } catch (err) {
       console.error('Failed to delete task:', err)
       toast.error('Verwijderen mislukt')
@@ -377,165 +408,6 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
     )
   }
 
-  if (presentationMode) {
-    return (
-      <div className="h-screen p-4 md:p-6 bg-gradient-to-br from-pastel-cream to-pastel-mint/20 overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between mb-4 md:mb-6">
-          <div className="w-8 md:w-10" />
-
-          <div className="text-center">
-            <h1 className="text-xl md:text-3xl font-bold text-gray-800">Huishouden</h1>
-            <p className="text-sm md:text-lg text-gray-500 font-medium mt-1 md:mt-2">
-              {weekDates[0].getDate()} {MONTH_NAMES[weekDates[0].getMonth()]} – {weekDates[6].getDate()} {MONTH_NAMES[weekDates[6].getMonth()]}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
-              {users.filter(u => u.can_do_chores).map(u => {
-                const c = getUserColor(u)
-                return (
-                  <div key={u.id} className="flex items-center gap-1">
-                    <div className={`w-3 h-3 rounded-full ${c.dot}`}></div>
-                    <span>{u.name}</span>
-                  </div>
-                )
-              })}
-            </div>
-            <button onClick={onTogglePresentation} className="p-2 hover:bg-white/60 rounded-lg transition-colors" title="Presentatie modus afsluiten">
-              <svg className="w-5 h-5 md:w-6 md:h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Desktop: all days side by side */}
-        <div className="md:flex-1 md:flex md:gap-4 md:overflow-x-auto hidden">
-           {DAYS.map((day, i) => {
-            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(i)
-            const isToday = formatDateISO(weekDates[i]) === todayStr
-            const hasItems = dayTasks.length > 0 || dayGhosts.length > 0
-
-            return (
-              <div key={i} className="flex-1 flex flex-col min-w-0 bg-white/60 rounded-2xl">
-                <div className={`text-center p-3 md:p-4 transition-all duration-300 ${
-                  isToday
-                    ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg'
-                    : 'bg-white shadow-sm'
-                }`}>
-                  <p className={`font-medium ${isToday ? 'text-white/80' : 'text-gray-500'}`}>{DAYS[i]}</p>
-                  <p className={`text-2xl md:text-3xl font-bold mt-1 ${isToday ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[i])}</p>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                  {renderDayInfoCard(i, true)}
-                  {renderGroupedTasks(
-                    taskGroups,
-                    completedTasks,
-                    (task, showCategory) => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        onComplete={() => handleCompleteTask(task)}
-                        onUncomplete={() => handleUncompleteTask(task)}
-                        users={users}
-                        isToday={isToday}
-                        presentationMode={true}
-                        showCategory={showCategory}
-                      />
-                    ),
-                    ghost => (
-                      <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
-                    ),
-                    true
-                  )}
-                  {!hasItems && !getMealForDay(i) && getDailyEntriesForDay(i).length === 0 && (
-                    <div className="text-center text-gray-400 py-8 text-sm">
-                      Geen taken
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Mobile: swipeable day tabs */}
-        <div className="flex-1 md:hidden flex flex-col overflow-hidden">
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-3 snap-x">
-            {DAYS.map((day, i) => {
-              const isToday = formatDateISO(weekDates[i]) === todayStr
-              return (
-                <button
-                  key={i}
-                  onClick={() => setSelectedDate(formatDateISO(weekDates[i]))}
-                  className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all snap-start ${
-                    selectedDayIndex === i
-                      ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-soft'
-                      : isToday
-                        ? 'bg-white shadow-card text-gray-700'
-                        : 'bg-white/60 text-gray-500'
-                  }`}
-                >
-                  <span className="block text-xs opacity-70">{day}</span>
-                  <span className="block text-lg font-bold mt-0.5">{formatDate(weekDates[i])}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="flex-1 overflow-y-auto bg-white/60 rounded-2xl">
-            <div className={`text-center p-3 transition-all duration-300 ${
-              selectedDate === todayStr
-                ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg rounded-t-2xl'
-                : 'bg-white shadow-sm rounded-t-2xl'
-            }`}>
-              <p className={`font-medium ${selectedDate === todayStr ? 'text-white/80' : 'text-gray-500'}`}>{selectedDayName}</p>
-              <p className={`text-3xl font-bold mt-1 ${selectedDate === todayStr ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[selectedDayIndex])}</p>
-            </div>
-
-            <div className="p-3 space-y-2">
-              {(() => {
-                const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(selectedDayIndex)
-                return (
-                  <>
-                    {renderDayInfoCard(selectedDayIndex)}
-                    {renderGroupedTasks(
-                      taskGroups,
-                      completedTasks,
-                      (task, showCategory) => (
-                        <TaskItem
-                          key={task.id}
-                          task={task}
-                          onComplete={() => handleCompleteTask(task)}
-                          onUncomplete={() => handleUncompleteTask(task)}
-                          users={users}
-                          isToday={selectedDate === todayStr}
-                          presentationMode={true}
-                          showCategory={showCategory}
-                        />
-                      ),
-                      ghost => (
-                        <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={true} />
-                      ),
-                      true
-                    )}
-                {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(selectedDayIndex) && getDailyEntriesForDay(selectedDayIndex).length === 0 && getDayStatusesForDay(selectedDayIndex).length === 0 && (
-                      <div className="text-center text-gray-400 py-8">
-                        Geen taken
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-pastel-cream flex items-center justify-center">
@@ -559,11 +431,20 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
 
           <h1 className="text-lg font-semibold text-gray-800">Huishouden</h1>
 
-          <button onClick={onTogglePresentation} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors" title="Presentatie modus">
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </button>
+          {/* User legend for desktop — fills the header right side */}
+          <div className="hidden md:flex items-center gap-2.5 text-sm text-gray-500">
+            {users.filter(u => u.can_do_chores).map(u => {
+              const c = getUserColor(u)
+              return (
+                <div key={u.id} className="flex items-center gap-1">
+                  <div className={`w-3 h-3 rounded-full ${c.dot}`} />
+                  <span>{u.name}</span>
+                </div>
+              )
+            })}
+          </div>
+          {/* Spacer on mobile to balance the hamburger */}
+          <div className="w-10 md:hidden" />
         </div>
 
         <div className="px-4 pb-3">
@@ -601,85 +482,30 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
         </div>
       </div>
 
-      <div className="px-3 pt-3 pb-1">
-        <div
-          ref={dateBarRef}
-          className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-hide"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {dateRange.map((d, i) => {
-            const iso = formatDateISO(d)
-            const isActive = iso === selectedDate
-            const isToday = iso === todayStr
-            const dayIdx = weekDates.findIndex(wd => formatDateISO(wd) === iso)
-            const hasTasks = dayIdx >= 0 && (() => {
-              const { tasks: dt, ghosts: dg } = getItemsForDay(dayIdx)
-              return dt.length > 0 || dg.length > 0
-            })()
+      {/* ============ DESKTOP: 7-column week grid ============ */}
+      <div className="hidden md:flex flex-1 gap-3 px-4 pt-3 pb-32 overflow-x-auto">
+        {DAYS.map((day, i) => {
+          const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(i)
+          const isToday = formatDateISO(weekDates[i]) === todayStr
+          const dateStr = formatDateISO(weekDates[i])
+          const hasItems = dayTasks.length > 0 || dayGhosts.length > 0
 
-            // Show month label when month changes
-            const prevDate = i > 0 ? dateRange[i - 1] : null
-            const showMonth = !prevDate || prevDate.getMonth() !== d.getMonth()
-
-            return (
+          return (
+            <div key={i} className="flex-1 flex flex-col min-w-[140px] bg-white/60 rounded-2xl overflow-hidden">
               <button
-                key={iso}
-                ref={isActive ? selectedDateRef : undefined}
-                onClick={() => setSelectedDate(iso)}
-                className={`day-tab min-w-[56px] flex-shrink-0 snap-center relative ${
-                  isActive
-                    ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-soft'
-                    : isToday
-                      ? 'bg-white shadow-card text-gray-700'
-                      : 'bg-white/50 text-gray-500 hover:bg-white'
+                onClick={() => setSelectedDate(dateStr)}
+                className={`text-center p-3 transition-all duration-300 ${
+                  isToday
+                    ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg'
+                    : 'bg-white shadow-sm hover:bg-gray-50'
                 }`}
               >
-                {showMonth && (
-                  <p className={`text-[9px] font-semibold uppercase tracking-wider mb-0.5 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
-                    {MONTH_NAMES[d.getMonth()]}
-                  </p>
-                )}
-                <p className={`text-xs ${showMonth ? '' : 'mt-3'} ${isActive ? 'text-white/80' : 'opacity-70'}`}>{getDayAbbr(d)}</p>
-                <p className="text-lg font-semibold mt-0.5">{d.getDate()}</p>
-                {hasTasks && !isActive && (
-                  <span className="w-1.5 h-1.5 bg-accent-mint rounded-full mx-auto mt-1"></span>
-                )}
+                <p className={`font-medium text-sm ${isToday ? 'text-white/80' : 'text-gray-500'}`}>{DAYS[i]}</p>
+                <p className={`text-2xl font-bold mt-0.5 ${isToday ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[i])}</p>
               </button>
-            )
-          })}
-        </div>
 
-        {selectedDate !== todayStr && (
-          <div className="flex justify-center mt-1 mb-0.5">
-            <button
-              onClick={goToToday}
-              className="text-xs font-medium text-accent-mint bg-pastel-mint/30 hover:bg-pastel-mint/50 px-3 py-1 rounded-full transition-colors"
-            >
-              Vandaag
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="px-4 pb-32">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">
-            {selectedDayName}
-          </h2>
-          {selectedDate === todayStr && (
-            <span className="text-xs font-medium text-accent-mint bg-pastel-mint/30 px-3 py-1 rounded-full">
-              Vandaag
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          {(() => {
-            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(selectedDayIndex)
-            const isToday = selectedDate === todayStr
-            return (
-              <>
-                {renderDayInfoCard(selectedDayIndex)}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {renderDayInfoCard(i, true)}
                 {renderGroupedTasks(
                   taskGroups,
                   completedTasks,
@@ -695,29 +521,146 @@ export default function WeekView({ currentUser, users, onComplete, presentationM
                       onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
                       users={users}
                       isToday={isToday}
-                      presentationMode={false}
+                      compact
                       resetKey={resetKey}
                       showCategory={showCategory}
                     />
                   ),
                   ghost => (
-                    <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} presentationMode={false} />
-                  )
+                    <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} compact />
+                  ),
+                  true
                 )}
-                {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(selectedDayIndex) && getDailyEntriesForDay(selectedDayIndex).length === 0 && (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-pastel-lavender/50 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                      <svg className="w-8 h-8 text-pastel-lavenderDark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                    </div>
-                    <p className="text-gray-400">Geen taken voor deze dag</p>
-                    <p className="text-gray-300 text-sm mt-1">Druk op + om een taak toe te voegen</p>
+                {!hasItems && !getMealForDay(i) && getDailyEntriesForDay(i).length === 0 && getDayStatusesForDay(i).length === 0 && (
+                  <div className="text-center text-gray-400 py-6 text-xs">
+                    Geen taken
                   </div>
                 )}
-              </>
-            )
-          })()}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ============ MOBILE: scrollable date bar + single day ============ */}
+      <div className="md:hidden">
+        <div className="px-3 pt-3 pb-1">
+          <div
+            ref={dateBarRef}
+            className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-hide"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {dateRange.map((d, i) => {
+              const iso = formatDateISO(d)
+              const isActive = iso === selectedDate
+              const isToday = iso === todayStr
+              const dayIdx = weekDates.findIndex(wd => formatDateISO(wd) === iso)
+              const hasTasks = dayIdx >= 0 && (() => {
+                const { tasks: dt, ghosts: dg } = getItemsForDay(dayIdx)
+                return dt.length > 0 || dg.length > 0
+              })()
+
+              // Show month label when month changes
+              const prevDate = i > 0 ? dateRange[i - 1] : null
+              const showMonth = !prevDate || prevDate.getMonth() !== d.getMonth()
+
+              return (
+                <button
+                  key={iso}
+                  ref={isActive ? selectedDateRef : undefined}
+                  onClick={() => setSelectedDate(iso)}
+                  className={`day-tab min-w-[56px] flex-shrink-0 snap-center relative ${
+                    isActive
+                      ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-soft'
+                      : isToday
+                        ? 'bg-white shadow-card text-gray-700'
+                        : 'bg-white/50 text-gray-500 hover:bg-white'
+                  }`}
+                >
+                  {showMonth && (
+                    <p className={`text-[9px] font-semibold uppercase tracking-wider mb-0.5 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                      {MONTH_NAMES[d.getMonth()]}
+                    </p>
+                  )}
+                  <p className={`text-xs ${showMonth ? '' : 'mt-3'} ${isActive ? 'text-white/80' : 'opacity-70'}`}>{getDayAbbr(d)}</p>
+                  <p className="text-lg font-semibold mt-0.5">{d.getDate()}</p>
+                  {hasTasks && !isActive && (
+                    <span className="w-1.5 h-1.5 bg-accent-mint rounded-full mx-auto mt-1"></span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {selectedDate !== todayStr && (
+            <div className="flex justify-center mt-1 mb-0.5">
+              <button
+                onClick={goToToday}
+                className="text-xs font-medium text-accent-mint bg-pastel-mint/30 hover:bg-pastel-mint/50 px-3 py-1 rounded-full transition-colors"
+              >
+                Vandaag
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="px-4 pb-32">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {selectedDayName}
+            </h2>
+            {selectedDate === todayStr && (
+              <span className="text-xs font-medium text-accent-mint bg-pastel-mint/30 px-3 py-1 rounded-full">
+                Vandaag
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {(() => {
+              const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(selectedDayIndex)
+              const isToday = selectedDate === todayStr
+              return (
+                <>
+                  {renderDayInfoCard(selectedDayIndex)}
+                  {renderGroupedTasks(
+                    taskGroups,
+                    completedTasks,
+                    (task, showCategory) => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        onComplete={() => handleCompleteTask(task)}
+                        onUncomplete={() => handleUncompleteTask(task)}
+                        onEdit={(t) => { setEditTask(t); setShowModal(true) }}
+                        onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
+                        onDeleteAttempt={() => setResetKey(k => k + 1)}
+                        onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
+                        users={users}
+                        isToday={isToday}
+                        resetKey={resetKey}
+                        showCategory={showCategory}
+                      />
+                    ),
+                    ghost => (
+                      <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} />
+                    )
+                  )}
+                  {dayTasks.length === 0 && dayGhosts.length === 0 && !getMealForDay(selectedDayIndex) && getDailyEntriesForDay(selectedDayIndex).length === 0 && (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-pastel-lavender/50 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-pastel-lavenderDark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                      </div>
+                      <p className="text-gray-400">Geen taken voor deze dag</p>
+                      <p className="text-gray-300 text-sm mt-1">Druk op + om een taak toe te voegen</p>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
         </div>
       </div>
 
