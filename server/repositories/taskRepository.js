@@ -55,13 +55,13 @@ export function findById(id) {
 /**
  * Create a one-off task (no schedule).
  */
-export function create({ title, date, assigned_to, is_both, notes }) {
+export function create({ title, date, assigned_to, is_both, notes, calendar_event_id }) {
   const db = getDb()
   const id = generateId()
   db.prepare(`
-    INSERT INTO tasks (id, title, date, assigned_to, is_both, notes)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, title, date, assigned_to || null, is_both ? 1 : 0, notes || null)
+    INSERT INTO tasks (id, title, date, assigned_to, is_both, notes, calendar_event_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, date, assigned_to || null, is_both ? 1 : 0, notes || null, calendar_event_id || null)
   return findById(id)
 }
 
