@@ -6,7 +6,7 @@ import ScheduleModal from './ScheduleModal'
 import Confetti from './Confetti'
 import useLiveSync from '../hooks/useLiveSync'
 
-export default function SchedulesView({ currentUser, users, onOpenMenu }) {
+export default function SchedulesView({ currentUser, users, onBack }) {
   const [schedules, setSchedules] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -204,14 +204,14 @@ export default function SchedulesView({ currentUser, users, onOpenMenu }) {
 
       <div className="sticky top-0 z-40 glass border-b border-gray-100">
         <div className="flex items-center justify-between px-4 py-3">
-          <button onClick={onOpenMenu} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors">
+          <button onClick={onBack} className="p-2.5 rounded-xl hover:bg-white/60 transition-colors">
             <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           
           <div className="text-center">
-            <h1 className="text-lg font-semibold text-gray-800">Schema's</h1>
+            <h1 className="text-lg font-semibold text-gray-800">Klusjesschema</h1>
             {counts.postponed > 0 && (
               <p className="text-xs text-red-500 font-medium mt-0.5">
                 {counts.postponed} uitgesteld

@@ -8,6 +8,7 @@ import MealsView from './components/MealsView'
 import GroceryView from './components/GroceryView'
 import DagschemaView from './components/DagschemaView'
 import AgendaView from './components/AgendaView'
+import FutureView from './components/FutureView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
 import Confetti from './components/Confetti'
@@ -21,7 +22,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     try {
       const saved = localStorage.getItem('activeTab')
-      if (saved && ['weekly', 'meals', 'schedules', 'grocery', 'dagschema', 'agenda'].includes(saved)) return saved
+      if (saved && ['weekly', 'meals', 'future', 'grocery', 'dagschema', 'agenda'].includes(saved)) return saved
     } catch {}
     return 'weekly'
   })
@@ -283,6 +284,14 @@ export default function App() {
         <GroceryView
           onOpenMenu={() => setShowMenu(true)}
         />
+      ) : view === 'future' ? (
+        <FutureView
+          currentUser={currentUser}
+          users={users}
+          calendarEnabled={!!calendarEnabled}
+          onOpenMenu={() => setShowMenu(true)}
+          onComplete={handleComplete}
+        />
       ) : view === 'dagschema' ? (
         <DagschemaView
           users={users}
@@ -292,13 +301,13 @@ export default function App() {
         <AgendaView
           onBack={() => setView('weekly')}
         />
-      ) : (
+      ) : view === 'schedules' ? (
         <SchedulesView
           currentUser={currentUser}
           users={users}
-          onOpenMenu={() => setShowMenu(true)}
+          onBack={() => setView('weekly')}
         />
-      )}
+      ) : null}
 
       <div className="fixed bottom-0 left-0 right-0 z-30 glass border-t border-gray-200">
         <div className="flex">
@@ -338,15 +347,15 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={() => setView('schedules')}
+            onClick={() => setView('future')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-              view === 'schedules' ? 'text-accent-mint' : 'text-gray-400'
+              view === 'future' ? 'text-accent-mint' : 'text-gray-400'
             }`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
-            <span className="text-xs font-medium">Schema's</span>
+            <span className="text-xs font-medium">Toekomst</span>
           </button>
         </div>
       </div>
@@ -357,13 +366,17 @@ export default function App() {
           onLogout={handleLogout}
           currentUser={currentUser}
           onUpdateUser={handleUpdateUser}
-          onOpenStats={() => {
+          onOpenStats={__FEATURE_STATS__ ? () => {
             setShowMenu(false)
             setShowStats(true)
-          }}
+          } : undefined}
           onOpenDagschema={() => {
             setShowMenu(false)
             setView('dagschema')
+          }}
+          onOpenSchedules={() => {
+            setShowMenu(false)
+            setView('schedules')
           }}
           onOpenAgenda={calendarEnabled ? () => {
             setShowMenu(false)
@@ -380,7 +393,7 @@ export default function App() {
         />
       )}
 
-      {showStats && (
+      {__FEATURE_STATS__ && showStats && (
         <Stats 
           onClose={() => setShowStats(false)}
           users={users}
