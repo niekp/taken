@@ -333,7 +333,7 @@ export default function FutureView({ currentUser, users, calendarEnabled, onOpen
   }
 
   return (
-    <div className="min-h-screen bg-pastel-cream pb-24">
+    <div className="min-h-screen bg-pastel-cream pb-24 overflow-x-hidden">
       {/* Header */}
       <div className="sticky top-0 z-40 glass border-b border-gray-100">
         <div className="flex items-center justify-between px-4 py-3">
@@ -394,28 +394,30 @@ export default function FutureView({ currentUser, users, calendarEnabled, onOpen
 
             return (
               <div key={dateStr}>
-                {/* Date header */}
-                <div className="flex items-center gap-2 mb-1.5">
-                  <h2 className={`text-sm font-semibold flex-shrink-0 ${today ? 'text-accent-mint' : tomorrow ? 'text-gray-700' : 'text-gray-500'}`}>
-                    {formatDateLabel(dateStr)}
-                  </h2>
-                  {dayStatuses[dateStr]?.length > 0 && (
-                    <div className="flex items-center gap-1 flex-wrap flex-shrink-0">
-                      {dayStatuses[dateStr].map(s => {
-                        const sc = getStatusColor(s.color)
-                        return (
-                          <div key={s.id} className="flex items-center gap-1 bg-white/70 shadow-card px-2 py-0.5 rounded-lg">
-                            <div className={`w-3 h-3 rounded-full ${sc.swatch}`} />
-                            <span className="text-[10px] text-gray-500">{s.label}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                  {dailyEntries[dateStr]?.length > 0 && (
-                    <DailyEntryPills entries={dailyEntries[dateStr]} users={users} />
-                  )}
-                  <div className="flex-1 h-px bg-gray-200" />
+                {/* Date header — horizontally scrollable so pills don't widen the page */}
+                <div className="overflow-x-auto scrollbar-hide mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h2 className={`text-sm font-semibold flex-shrink-0 ${today ? 'text-accent-mint' : tomorrow ? 'text-gray-700' : 'text-gray-500'}`}>
+                      {formatDateLabel(dateStr)}
+                    </h2>
+                    {dayStatuses[dateStr]?.length > 0 && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {dayStatuses[dateStr].map(s => {
+                          const sc = getStatusColor(s.color)
+                          return (
+                            <div key={s.id} className="flex items-center gap-1 bg-white/70 shadow-card px-2 py-0.5 rounded-lg flex-shrink-0">
+                              <div className={`w-3 h-3 rounded-full ${sc.swatch}`} />
+                              <span className="text-[10px] text-gray-500 whitespace-nowrap">{s.label}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {dailyEntries[dateStr]?.length > 0 && (
+                      <DailyEntryPills entries={dailyEntries[dateStr]} users={users} />
+                    )}
+                    <div className="flex-1 h-px bg-gray-200 min-w-[24px]" />
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -525,12 +527,12 @@ function DailyEntryPills({ entries, users }) {
   if (userEntries.length === 0) return null
 
   return (
-    <div className="flex items-center gap-1 flex-wrap flex-shrink-0">
+    <div className="flex items-center gap-1 flex-shrink-0">
       {userEntries.map(([name, { labels }]) => {
         const userObj = users.find(u => u.name === name)
         const color = userObj ? getUserColor(userObj) : { bg: 'bg-gray-300' }
         return (
-          <div key={name} className="flex items-center gap-1 bg-white/70 shadow-card px-2 py-0.5 rounded-lg">
+          <div key={name} className="flex items-center gap-1 bg-white/70 shadow-card px-2 py-0.5 rounded-lg flex-shrink-0">
             {userObj?.avatar_url ? (
               <img src={userObj.avatar_url} alt={name} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
             ) : (
@@ -538,7 +540,7 @@ function DailyEntryPills({ entries, users }) {
                 <span className="text-white font-bold text-[6px] leading-none">{name.charAt(0)}</span>
               </div>
             )}
-            <span className="text-[10px] text-gray-500 truncate max-w-[80px]">{labels.join(', ')}</span>
+            <span className="text-[10px] text-gray-500 whitespace-nowrap max-w-[80px] truncate">{labels.join(', ')}</span>
           </div>
         )
       })}
