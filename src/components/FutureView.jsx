@@ -47,6 +47,8 @@ export default function FutureView({ currentUser, users, calendarEnabled, onOpen
   const [dayStatuses, setDayStatuses] = useState({})
   const [dailyEntries, setDailyEntries] = useState({})
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSynced, setLastSynced] = useState(null)
   const [editTask, setEditTask] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [eventAction, setEventAction] = useState(null) // { eventId, mode: 'choose'|'status'|'task', date, label, color }
@@ -64,6 +66,7 @@ export default function FutureView({ currentUser, users, calendarEnabled, onOpen
       if (calendarEnabled) {
         const calData = await api.getCalendarEvents(from)
         allEvents = calData.events || []
+        setLastSynced(calData.last_synced_at || null)
         // Extend range to cover the furthest calendar event
         if (allEvents.length > 0) {
           const maxEventDate = allEvents.reduce((max, e) => e.start_date > max ? e.start_date : max, allEvents[0].start_date)
@@ -102,6 +105,35 @@ export default function FutureView({ currentUser, users, calendarEnabled, onOpen
   useLiveSync('tasks', loadData)
   useLiveSync('day-statuses', loadData)
   useLiveSync('daily-schedules', loadData)
+
+  // --- Calendar sync ---
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      const result = await api.syncCalendar()
+      toast.success(`${result.synced} events gesynchroniseerd`)
+      await loadData()
+    } catch (err) {
+      console.error('Calendar sync failed:', err)
+      if (isMutationQueued(err)) {
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Synchronisatie mislukt')
+      }
+    }
+    setSyncing(false)
+  }
+
+  function formatSyncTime(ts) {
+    if (!ts) return null
+    const d = new Date(ts + 'Z') // SQLite datetime is UTC
+    return d.toLocaleString('nl-NL', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
 
   // --- Task actions ---
   async function handleCompleteTask(task) {
@@ -287,7 +319,7 @@ export default function FutureView({ currentUser, users, calendarEnabled, onOpen
               </svg>
             </button>
             <h1 className="text-lg font-semibold text-gray-800">Toekomst</h1>
-            <div className="w-10" />
+            {calendarEnabled ? <div className="w-10" /> : <div className="w-10" />}
           </div>
         </div>
         <div className="flex items-center justify-center py-20">
@@ -310,8 +342,25 @@ export default function FutureView({ currentUser, users, calendarEnabled, onOpen
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-lg font-semibold text-gray-800">Toekomst</h1>
-          <div className="w-10" />
+          <div className="flex flex-col items-center">
+            <h1 className="text-lg font-semibold text-gray-800">Toekomst</h1>
+            {calendarEnabled && lastSynced && (
+              <p className="text-[10px] text-gray-400 -mt-0.5">Sync: {formatSyncTime(lastSynced)}</p>
+            )}
+          </div>
+          {calendarEnabled ? (
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="p-2.5 rounded-xl hover:bg-white/60 transition-colors disabled:opacity-50"
+            >
+              <svg className={`w-5 h-5 text-gray-600 ${syncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          ) : (
+            <div className="w-10" />
+          )}
         </div>
       </div>
 

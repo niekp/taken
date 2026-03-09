@@ -7,7 +7,6 @@ import SchedulesView from './components/SchedulesView'
 import MealsView from './components/MealsView'
 import GroceryView from './components/GroceryView'
 import DagschemaView from './components/DagschemaView'
-import AgendaView from './components/AgendaView'
 import FutureView from './components/FutureView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
@@ -22,7 +21,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     try {
       const saved = localStorage.getItem('activeTab')
-      if (saved && ['weekly', 'meals', 'future', 'grocery', 'dagschema', 'agenda'].includes(saved)) return saved
+      if (saved && ['weekly', 'meals', 'future', 'grocery', 'dagschema'].includes(saved)) return saved
     } catch {}
     return 'weekly'
   })
@@ -119,13 +118,6 @@ export default function App() {
       setView('weekly')
     }
   }, [bringEnabled])
-
-  // If saved tab was 'agenda' but calendar is disabled, fall back to weekly
-  useEffect(() => {
-    if (view === 'agenda' && calendarEnabled === false) {
-      setView('weekly')
-    }
-  }, [calendarEnabled])
 
   // Persist active tab
   useEffect(() => {
@@ -297,10 +289,6 @@ export default function App() {
           users={users}
           onBack={() => setView('weekly')}
         />
-      ) : view === 'agenda' ? (
-        <AgendaView
-          onBack={() => setView('weekly')}
-        />
       ) : view === 'schedules' ? (
         <SchedulesView
           currentUser={currentUser}
@@ -378,10 +366,6 @@ export default function App() {
             setShowMenu(false)
             setView('schedules')
           }}
-          onOpenAgenda={calendarEnabled ? () => {
-            setShowMenu(false)
-            setView('agenda')
-          } : undefined}
           onOpenUserManagement={() => {
             setShowMenu(false)
             setShowUserManagement(true)
