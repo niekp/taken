@@ -142,9 +142,7 @@ export default function SchedulesView({ currentUser, users, onBack }) {
     if (schedule.status === 'postponed') {
       const days = schedule.days_late
       return (
-        <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-          {days > 0 ? `${days} ${days === 1 ? 'dag' : 'dagen'} uitgesteld` : 'Uitgesteld'}
-        </span>
+        <span className="text-[10px] text-red-400/70">→</span>
       )
     }
     if (schedule.status === 'due') {

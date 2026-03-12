@@ -182,9 +182,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
             <span className="inline-flex items-center mt-0.5 text-[10px] text-gray-400">{task.category}</span>
           )}
           {isOverdue && !isCompleted && (
-            <span className="inline-flex items-center mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-medium">
-              Uitgesteld
-            </span>
+            <span className="text-[10px] text-red-400/60">→</span>
           )}
           {syncBadge}
           {task.notes && !isCompleted && (
@@ -365,9 +363,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
                 </span>
               )}
               {isOverdue && !isCompleted && (
-                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-red-50 text-red-600">
-                  Uitgesteld
-                </span>
+                <span className="text-[11px] text-red-400/60">→</span>
               )}
               {showCategory && task.category && (
                 <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-50 text-gray-400">
