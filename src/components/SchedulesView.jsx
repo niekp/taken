@@ -139,13 +139,7 @@ export default function SchedulesView({ currentUser, users, onBack }) {
   }
 
   function getStatusBadge(schedule) {
-    if (schedule.status === 'postponed') {
-      const days = schedule.days_late
-      return (
-        <span className="text-[10px] text-red-400/70">→</span>
-      )
-    }
-    if (schedule.status === 'due') {
+    if (schedule.status === 'postponed' || schedule.status === 'due') {
       return (
         <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
           Vandaag

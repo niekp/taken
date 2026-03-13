@@ -155,10 +155,11 @@ export function complete(id, userId) {
   if (task && task.schedule_id) {
     const schedule = db.prepare('SELECT * FROM schedules WHERE id = ?').get(task.schedule_id)
     if (schedule) {
-      // Next task date = this task's date + interval_days
-      const taskDate = new Date(task.date + 'T00:00:00')
-      taskDate.setDate(taskDate.getDate() + schedule.interval_days)
-      const nextDate = formatDateLocal(taskDate)
+      // Next task date = today + interval_days (based on completion date, not scheduled date)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      today.setDate(today.getDate() + schedule.interval_days)
+      const nextDate = formatDateLocal(today)
 
       nextTask = createTaskForSchedule(
         { ...schedule, is_both: !!schedule.is_both },

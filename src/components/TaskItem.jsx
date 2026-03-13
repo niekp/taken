@@ -5,7 +5,6 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
   const isCompleted = !!task.completed_at
   const isGhost = !!task.is_ghost
   const isPendingSync = !!task.is_pending_sync
-  const isOverdue = task.original_date && task.date !== task.original_date
 
   const assignedUser = users.find(u => u.id === task.assigned_to)
   const completedByUser = users.find(u => u.id === task.completed_by)
@@ -180,9 +179,6 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
           </p>
           {showCategory && task.category && (
             <span className="inline-flex items-center mt-0.5 text-[10px] text-gray-400">{task.category}</span>
-          )}
-          {isOverdue && !isCompleted && (
-            <span className="text-[10px] text-red-400/60">→</span>
           )}
           {syncBadge}
           {task.notes && !isCompleted && (
@@ -361,9 +357,6 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
                   </svg>
                   {task.interval_days}d
                 </span>
-              )}
-              {isOverdue && !isCompleted && (
-                <span className="text-[11px] text-red-400/60">→</span>
               )}
               {showCategory && task.category && (
                 <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-50 text-gray-400">
