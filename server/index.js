@@ -8,6 +8,8 @@ import apiRouter from './routes.js'
 import * as notifications from './lib/notifications.js'
 import { syncCalendar } from './lib/calendar.js'
 import * as sessionRepo from './repositories/sessionRepository.js'
+import { runHousekeeping } from './repositories/taskRepository.js'
+import { broadcast } from './lib/liveSync.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -92,8 +94,25 @@ cron.schedule('0 3 * * *', () => {
   }
 })
 
+// Cron: every hour, run task housekeeping (move overdue tasks to today)
+cron.schedule('0 * * * *', () => {
+  try {
+    const moved = runHousekeeping()
+    if (moved > 0) broadcast('tasks')
+  } catch (err) {
+    console.error('Error running task housekeeping:', err.message)
+  }
+})
+
 // Initial calendar sync on startup (non-blocking)
 syncCalendar().catch(() => {})
+
+// Initial housekeeping on startup (move overdue tasks to today)
+try {
+  runHousekeeping()
+} catch (err) {
+  console.error('Error running initial housekeeping:', err.message)
+}
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Huishouden server running on port ${PORT}`)

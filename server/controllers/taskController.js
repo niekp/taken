@@ -79,12 +79,6 @@ export function uncomplete(req, res) {
   res.json(task)
 }
 
-export function housekeeping(req, res) {
-  const moved = taskRepo.runHousekeeping()
-  if (moved > 0) broadcast('tasks')
-  res.json({ moved })
-}
-
 export function history(req, res) {
   const limit = req.query.limit ? Number(req.query.limit) : 50
   res.json(taskRepo.findCompletionHistory(limit))

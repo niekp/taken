@@ -27,8 +27,6 @@ export default function SchedulesView({ currentUser, users, onBack }) {
 
   async function loadSchedules() {
     try {
-      // Fire-and-forget housekeeping — never blocks schedule loading
-      api.runHousekeeping().catch(() => {})
       const data = await api.getSchedules()
       setSchedules(data)
     } catch (err) {

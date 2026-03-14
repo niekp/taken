@@ -169,11 +169,6 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
     const to = formatDateISO(weekDates[6])
 
     try {
-      // Fire-and-forget housekeeping — never blocks data loading
-      if (isCurrentWeek) {
-        api.runHousekeeping().catch(() => {})
-      }
-
       const [taskData, mealData, entriesData, statusData] = await Promise.all([
         api.getTasks(from, to),
         api.getMeals(from, to),

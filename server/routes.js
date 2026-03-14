@@ -50,7 +50,6 @@ router.delete('/schedules/:id/notifications', scheduleController.removeNotificat
 // Tasks (static routes before parameterized)
 router.get('/tasks/history', taskController.history)
 router.get('/tasks/stats', taskController.stats)
-router.post('/tasks/housekeeping', taskController.housekeeping)
 router.get('/tasks', taskController.list)
 router.post('/tasks', taskController.create)
 router.put('/tasks/:id', taskController.update)

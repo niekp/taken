@@ -200,10 +200,6 @@ export const api = {
     method: 'POST',
   }),
 
-  runHousekeeping: () => request('/tasks/housekeeping', {
-    method: 'POST',
-  }),
-
   getHistory: (limit = 50) => request(`/tasks/history?limit=${limit}`),
 
   getStats: (period) => request(`/tasks/stats?period=${period}`),
