@@ -143,10 +143,15 @@ export function complete(id, userId) {
   const db = getDb()
   const now = new Date().toISOString()
 
-  db.prepare(`
+  const result = db.prepare(`
     UPDATE tasks SET completed_at = ?, completed_by = ?
     WHERE id = ? AND completed_at IS NULL
   `).run(now, userId, id)
+
+  // If no rows changed, the task was already completed — don't create a duplicate next task
+  if (result.changes === 0) {
+    return { task: findById(id), nextTask: null }
+  }
 
   const task = findById(id)
   let nextTask = null
@@ -155,16 +160,23 @@ export function complete(id, userId) {
   if (task && task.schedule_id) {
     const schedule = db.prepare('SELECT * FROM schedules WHERE id = ?').get(task.schedule_id)
     if (schedule) {
-      // Next task date = today + interval_days (based on completion date, not scheduled date)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      today.setDate(today.getDate() + schedule.interval_days)
-      const nextDate = formatDateLocal(today)
+      // Check if an uncompleted task for this schedule already exists (prevent duplicates)
+      const existing = db.prepare(
+        'SELECT id FROM tasks WHERE schedule_id = ? AND completed_at IS NULL LIMIT 1'
+      ).get(schedule.id)
 
-      nextTask = createTaskForSchedule(
-        { ...schedule, is_both: !!schedule.is_both },
-        nextDate
-      )
+      if (!existing) {
+        // Next task date = today + interval_days (based on completion date, not scheduled date)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        today.setDate(today.getDate() + schedule.interval_days)
+        const nextDate = formatDateLocal(today)
+
+        nextTask = createTaskForSchedule(
+          { ...schedule, is_both: !!schedule.is_both },
+          nextDate
+        )
+      }
     }
   }
 
