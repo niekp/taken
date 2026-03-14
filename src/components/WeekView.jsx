@@ -108,6 +108,7 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
 
   const todayStr = formatDateISO(new Date())
   const [selectedDate, setSelectedDate] = useState(todayStr)
+  const [desktopOffset, setDesktopOffset] = useState(0)
 
   // Build the scrollable date range: 4 weeks back to 4 weeks forward
   const dateRange = useCallback(() => {
@@ -140,6 +141,14 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
   const isCurrentWeek = weekDates.some(d => formatDateISO(d) === todayStr)
   const selectedDayName = DAY_NAMES[selectedDayIndex] || ''
 
+  // Desktop: rolling 7-day window (yesterday, today, +5 days) with offset navigation
+  const desktopDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() + (i - 1) + desktopOffset * 7)
+    return d
+  })
+
   // Scroll the selected date into view whenever it changes or loading finishes
   const initialScrollDone = useRef(false)
   useEffect(() => {
@@ -162,11 +171,13 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [selectedDate])
+  }, [selectedDate, desktopOffset])
 
   async function loadData() {
-    const from = formatDateISO(weekDates[0])
-    const to = formatDateISO(weekDates[6])
+    // Fetch the union range of mobile weekDates and desktop desktopDates
+    const allDates = [...weekDates, ...desktopDates].map(d => formatDateISO(d)).sort()
+    const from = allDates[0]
+    const to = allDates[allDates.length - 1]
 
     try {
       const [taskData, mealData, entriesData, statusData] = await Promise.all([
@@ -201,8 +212,8 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
   useLiveSync('daily-schedules', loadData)
   useLiveSync('day-statuses', loadData)
 
-  function getItemsForDay(dayIndex) {
-    const dateStr = formatDateISO(weekDates[dayIndex])
+  function getItemsForDay(dayIndex, dateOverride) {
+    const dateStr = dateOverride || formatDateISO(weekDates[dayIndex])
 
     // Start with real tasks, apply pending edits and filter out pending deletions
     let dayTasks = tasks
@@ -376,18 +387,18 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
     return date.getDate()
   }
 
-  function getMealForDay(dayIndex) {
-    const dateStr = formatDateISO(weekDates[dayIndex])
+  function getMealForDay(dayIndex, dateOverride) {
+    const dateStr = dateOverride || formatDateISO(weekDates[dayIndex])
     return meals.find(m => m.date === dateStr)
   }
 
-  function getDailyEntriesForDay(dayIndex) {
-    const dateStr = formatDateISO(weekDates[dayIndex])
+  function getDailyEntriesForDay(dayIndex, dateOverride) {
+    const dateStr = dateOverride || formatDateISO(weekDates[dayIndex])
     return dailyEntries[dateStr] || []
   }
 
-  function getDayStatusesForDay(dayIndex) {
-    const dateStr = formatDateISO(weekDates[dayIndex])
+  function getDayStatusesForDay(dayIndex, dateOverride) {
+    const dateStr = dateOverride || formatDateISO(weekDates[dayIndex])
     return dayStatuses[dateStr] || []
   }
 
@@ -445,11 +456,11 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
     return DAYS[dow]
   }
 
-  function renderDayInfoCard(dayIndex, compact = false) {
-    const entries = getDailyEntriesForDay(dayIndex)
-    const meal = getMealForDay(dayIndex)
-    const statuses = getDayStatusesForDay(dayIndex)
-    const dateStr = formatDateISO(weekDates[dayIndex])
+  function renderDayInfoCard(dayIndex, compact = false, dateOverride) {
+    const entries = getDailyEntriesForDay(dayIndex, dateOverride)
+    const meal = getMealForDay(dayIndex, dateOverride)
+    const statuses = getDayStatusesForDay(dayIndex, dateOverride)
+    const dateStr = dateOverride || formatDateISO(weekDates[dayIndex])
 
     // Group entries by user
     const byUser = {}
@@ -621,64 +632,98 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
         </div>
       </div>
 
-      {/* ============ DESKTOP: 7-column week grid ============ */}
-      <div className="hidden md:flex flex-1 gap-3 px-4 pt-3 pb-32 overflow-x-auto">
-        {DAYS.map((day, i) => {
-          const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(i)
-          const isToday = formatDateISO(weekDates[i]) === todayStr
-          const dateStr = formatDateISO(weekDates[i])
-          const hasItems = dayTasks.length > 0 || dayGhosts.length > 0
-
-          return (
-            <div key={i} className="flex-1 flex flex-col min-w-[140px] bg-white/60 rounded-2xl overflow-hidden">
+      {/* ============ DESKTOP: 7-column rolling grid with navigation ============ */}
+      <div className="hidden md:block px-4 pt-3 pb-32">
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => setDesktopOffset(o => o - 1)}
+            className="p-2 rounded-xl hover:bg-white/60 transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">
+              {desktopDates[0].getDate()} {MONTH_NAMES[desktopDates[0].getMonth()]} – {desktopDates[6].getDate()} {MONTH_NAMES[desktopDates[6].getMonth()]}
+            </span>
+            {desktopOffset !== 0 && (
               <button
-                onClick={() => setSelectedDate(dateStr)}
-                className={`text-center p-3 transition-all duration-300 ${
-                  isToday
-                    ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg'
-                    : 'bg-white shadow-sm hover:bg-gray-50'
-                }`}
+                onClick={() => setDesktopOffset(0)}
+                className="text-xs font-medium text-accent-mint hover:underline ml-1"
               >
-                <p className={`font-medium text-sm ${isToday ? 'text-white/80' : 'text-gray-500'}`}>{DAYS[i]}</p>
-                <p className={`text-2xl font-bold mt-0.5 ${isToday ? 'text-white' : 'text-gray-800'}`}>{formatDate(weekDates[i])}</p>
+                Vandaag
               </button>
+            )}
+          </div>
+          <button
+            onClick={() => setDesktopOffset(o => o + 1)}
+            className="p-2 rounded-xl hover:bg-white/60 transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex flex-1 gap-3 overflow-x-auto">
+          {desktopDates.map((date, i) => {
+            const dateStr = formatDateISO(date)
+            const dayOfWeek = date.getDay() === 0 ? 6 : date.getDay() - 1
+            const { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks } = getItemsForDay(null, dateStr)
+            const isToday = dateStr === todayStr
+            const hasItems = dayTasks.length > 0 || dayGhosts.length > 0
 
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {renderDayInfoCard(i, true)}
-                {renderGroupedTasks(
-                  taskGroups,
-                  completedTasks,
-                  (task, showCategory) => (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      onComplete={() => handleCompleteTask(task)}
-                      onUncomplete={() => handleUncompleteTask(task)}
-                      onEdit={(t) => { setEditTask(t); setShowModal(true) }}
-                      onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
-                      onDeleteAttempt={() => setResetKey(k => k + 1)}
-                      onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
-                      users={users}
-                      isToday={isToday}
-                      compact
-                      resetKey={resetKey}
-                      showCategory={showCategory}
-                    />
-                  ),
-                  ghost => (
-                    <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} compact />
-                  ),
-                  true
-                )}
-                {!hasItems && !getMealForDay(i) && getDailyEntriesForDay(i).length === 0 && getDayStatusesForDay(i).length === 0 && (
-                  <div className="text-center text-gray-400 py-6 text-xs">
-                    Geen taken
-                  </div>
-                )}
+            return (
+              <div key={dateStr} className="flex-1 flex flex-col min-w-[140px] bg-white/60 rounded-2xl overflow-hidden">
+                <button
+                  onClick={() => setSelectedDate(dateStr)}
+                  className={`text-center p-3 transition-all duration-300 ${
+                    isToday
+                      ? 'bg-gradient-to-br from-accent-mint to-pastel-mintDark text-white shadow-lg'
+                      : 'bg-white shadow-sm hover:bg-gray-50'
+                  }`}
+                >
+                  <p className={`font-medium text-sm ${isToday ? 'text-white/80' : 'text-gray-500'}`}>{DAYS[dayOfWeek]}</p>
+                  <p className={`text-2xl font-bold mt-0.5 ${isToday ? 'text-white' : 'text-gray-800'}`}>{formatDate(date)}</p>
+                </button>
+
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  {renderDayInfoCard(null, true, dateStr)}
+                  {renderGroupedTasks(
+                    taskGroups,
+                    completedTasks,
+                    (task, showCategory) => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        onComplete={() => handleCompleteTask(task)}
+                        onUncomplete={() => handleUncompleteTask(task)}
+                        onEdit={(t) => { setEditTask(t); setShowModal(true) }}
+                        onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
+                        onDeleteAttempt={() => setResetKey(k => k + 1)}
+                        onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
+                        users={users}
+                        isToday={isToday}
+                        compact
+                        resetKey={resetKey}
+                        showCategory={showCategory}
+                      />
+                    ),
+                    ghost => (
+                      <TaskItem key={ghost.id} task={ghost} users={users} isToday={false} compact />
+                    ),
+                    true
+                  )}
+                  {!hasItems && !getMealForDay(null, dateStr) && getDailyEntriesForDay(null, dateStr).length === 0 && getDayStatusesForDay(null, dateStr).length === 0 && (
+                    <div className="text-center text-gray-400 py-6 text-xs">
+                      Geen taken
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
 
       {/* ============ MOBILE: scrollable date bar + single day ============ */}
