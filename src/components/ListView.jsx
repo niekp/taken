@@ -5,7 +5,6 @@ import useLiveSync from '../hooks/useLiveSync'
 import ListImportModal from './ListImportModal'
 import {
   DndContext,
-  closestCenter,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -13,7 +12,6 @@ import {
   DragOverlay,
   pointerWithin,
   rectIntersection,
-  MeasuringStrategy,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -52,7 +50,7 @@ function SortableItem({ item, listType, onToggle, onDelete, onToTask, isDragMode
   })
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.3 : 1,
   }
@@ -176,6 +174,8 @@ export default function ListView({ listId, currentUser, users, onBack }) {
   const [activeId, setActiveId] = useState(null)
   // Local item order for optimistic drag updates
   const [localItems, setLocalItems] = useState(null)
+  // Ref to track drag state for liveSync gating
+  const isDraggingRef = useRef(false)
 
   const toast = useToast()
   const titleInputRef = useRef(null)
@@ -195,14 +195,13 @@ export default function ListView({ listId, currentUser, users, onBack }) {
   }, [listId])
 
   async function loadList() {
+    // Don't reload during an active drag — it would reset local optimistic state
+    if (isDraggingRef.current) return
     try {
       const data = await api.getList(listId)
       setList(data)
       setTitleValue(data.title)
-      // Only reset local items if we're not currently dragging
-      if (!activeId) {
-        setLocalItems(null)
-      }
+      setLocalItems(null)
     } catch (err) {
       console.error('Failed to load list:', err)
     }
@@ -252,9 +251,6 @@ export default function ListView({ listId, currentUser, users, onBack }) {
     }
     return result
   }, [grouped, newItemText])
-
-  // All item IDs for the current category (for SortableContext)
-  const allItemIds = useMemo(() => currentItems.map(i => i.id), [currentItems])
 
   // Find the active item for DragOverlay
   const activeItem = activeId ? currentItems.find(i => i.id === activeId) : null
@@ -427,6 +423,7 @@ export default function ListView({ listId, currentUser, users, onBack }) {
 
   function handleDragStart(event) {
     setActiveId(event.active.id)
+    isDraggingRef.current = true
     // Snapshot current items for local manipulation
     setLocalItems([...currentItems])
   }
@@ -466,26 +463,45 @@ export default function ListView({ listId, currentUser, users, onBack }) {
       // Same category: reorder
       const categoryItems = localItems.filter(i => (i.category || '') === currentCategory)
       const oldIndex = categoryItems.findIndex(i => i.id === activeItemId)
-      if (oldIndex === targetIndex) return
+      if (oldIndex === targetIndex || oldIndex === -1) return
 
       const reordered = arrayMove(categoryItems, oldIndex, targetIndex)
-      // Rebuild full items list
-      setLocalItems(prev => {
-        const others = prev.filter(i => (i.category || '') !== currentCategory)
-        return [...others, ...reordered.map((item, idx) => ({ ...item, sort_order: idx }))]
-      })
+      // Rebuild only if something changed — use stable ordering by preserving
+      // items from other categories in their original positions
+      const newItems = []
+      let catIdx = 0
+      for (const item of localItems) {
+        if ((item.category || '') === currentCategory) {
+          newItems.push({ ...reordered[catIdx], sort_order: catIdx })
+          catIdx++
+        } else {
+          newItems.push(item)
+        }
+      }
+      setLocalItems(newItems)
     } else {
-      // Cross-category: move item
+      // Cross-category: move item to new category
       setLocalItems(prev => {
+        // Move the item to the target category
         const updated = prev.map(i =>
           i.id === activeItemId ? { ...i, category: targetCategory } : i
         )
-        // Now reorder within the target category
+        // Reorder within the target category
         const targetItems = updated.filter(i => (i.category || '') === targetCategory)
         const currentIdx = targetItems.findIndex(i => i.id === activeItemId)
         const reordered = arrayMove(targetItems, currentIdx, Math.min(targetIndex, targetItems.length - 1))
-        const others = updated.filter(i => (i.category || '') !== targetCategory)
-        return [...others, ...reordered.map((item, idx) => ({ ...item, sort_order: idx }))]
+        // Rebuild preserving order of other categories
+        const newItems = []
+        let catIdx = 0
+        for (const item of updated) {
+          if ((item.category || '') === targetCategory) {
+            newItems.push({ ...reordered[catIdx], sort_order: catIdx })
+            catIdx++
+          } else {
+            newItems.push(item)
+          }
+        }
+        return newItems
       })
     }
   }
@@ -493,6 +509,7 @@ export default function ListView({ listId, currentUser, users, onBack }) {
   async function handleDragEnd(event) {
     const { active, over } = event
     setActiveId(null)
+    isDraggingRef.current = false
 
     if (!over || !localItems) {
       setLocalItems(null)
@@ -530,6 +547,7 @@ export default function ListView({ listId, currentUser, users, onBack }) {
 
   function handleDragCancel() {
     setActiveId(null)
+    isDraggingRef.current = false
     setLocalItems(null)
   }
 
@@ -639,7 +657,6 @@ export default function ListView({ listId, currentUser, users, onBack }) {
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
-          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         >
           <div className="space-y-5">
             {displayGroups.map(group => {
