@@ -72,6 +72,53 @@ export function importMarkdown(req, res) {
   res.json(list)
 }
 
+// ── Category operations ────────────────────────────────────────────
+
+export function renameCategory(req, res) {
+  const { oldName, newName } = req.body
+  if (newName === undefined || newName === null) {
+    return res.status(400).json({ error: 'newName is required' })
+  }
+  if (oldName === undefined || oldName === null) {
+    return res.status(400).json({ error: 'oldName is required' })
+  }
+
+  const existing = listRepo.findById(req.params.id)
+  if (!existing) return res.status(404).json({ error: 'List not found' })
+
+  const list = listRepo.renameCategory(req.params.id, oldName, newName.trim())
+  broadcast('lists')
+  res.json(list)
+}
+
+export function deleteCategory(req, res) {
+  const { category, moveTo } = req.body
+  if (category === undefined || category === null) {
+    return res.status(400).json({ error: 'category is required' })
+  }
+
+  const existing = listRepo.findById(req.params.id)
+  if (!existing) return res.status(404).json({ error: 'List not found' })
+
+  const list = listRepo.deleteCategory(req.params.id, category, moveTo)
+  broadcast('lists')
+  res.json(list)
+}
+
+export function reorderItems(req, res) {
+  const { items } = req.body
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: 'items must be an array' })
+  }
+
+  const existing = listRepo.findById(req.params.id)
+  if (!existing) return res.status(404).json({ error: 'List not found' })
+
+  const list = listRepo.reorderItems(req.params.id, items)
+  broadcast('lists')
+  res.json(list)
+}
+
 // ── Item operations ────────────────────────────────────────────────
 
 export function addItem(req, res) {

@@ -168,6 +168,68 @@ export function removeItem(itemId) {
 }
 
 /**
+ * Rename a category: update the category field on all items in a list
+ * that belong to the old category.
+ */
+export function renameCategory(listId, oldName, newName) {
+  const db = getDb()
+  db.prepare(`
+    UPDATE list_items SET category = ?
+    WHERE list_id = ? AND category = ?
+  `).run(newName, listId, oldName)
+  return findById(listId)
+}
+
+/**
+ * Delete a category: either delete all its items or move them to another category.
+ */
+export function deleteCategory(listId, category, moveTo) {
+  const db = getDb()
+  if (moveTo !== undefined && moveTo !== null) {
+    // Move items to another category (append at end of that category's sort_order)
+    const max = db.prepare(`
+      SELECT COALESCE(MAX(sort_order), -1) AS max_order
+      FROM list_items WHERE list_id = ? AND category = ?
+    `).get(listId, moveTo)
+    let nextOrder = (max?.max_order ?? -1) + 1
+
+    const items = db.prepare(`
+      SELECT id FROM list_items
+      WHERE list_id = ? AND category = ?
+      ORDER BY sort_order ASC
+    `).all(listId, category)
+
+    const updateStmt = db.prepare('UPDATE list_items SET category = ?, sort_order = ? WHERE id = ?')
+    const doMove = db.transaction(() => {
+      for (const item of items) {
+        updateStmt.run(moveTo, nextOrder++, item.id)
+      }
+    })
+    doMove()
+  } else {
+    // Delete all items in the category
+    db.prepare('DELETE FROM list_items WHERE list_id = ? AND category = ?').run(listId, category)
+  }
+  return findById(listId)
+}
+
+/**
+ * Bulk reorder items: accepts an array of { id, category, sort_order }.
+ * Used for drag-and-drop reordering within and between categories.
+ */
+export function reorderItems(listId, items) {
+  const db = getDb()
+  const updateStmt = db.prepare('UPDATE list_items SET category = ?, sort_order = ? WHERE id = ? AND list_id = ?')
+  const doReorder = db.transaction(() => {
+    for (const item of items) {
+      updateStmt.run(item.category, item.sort_order, item.id, listId)
+    }
+  })
+  doReorder()
+  return findById(listId)
+}
+
+/**
  * Import markdown text into a list.
  * Parses # and ## headings as categories, and - [ ] / - [x] as items.
  * Returns the updated list.

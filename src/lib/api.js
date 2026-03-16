@@ -367,4 +367,19 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+
+  renameListCategory: (listId, oldName, newName) => request(`/lists/${listId}/rename-category`, {
+    method: 'PUT',
+    body: JSON.stringify({ oldName, newName }),
+  }),
+
+  deleteListCategory: (listId, category, moveTo) => request(`/lists/${listId}/delete-category`, {
+    method: 'DELETE',
+    body: JSON.stringify({ category, moveTo }),
+  }),
+
+  reorderListItems: (listId, items) => request(`/lists/${listId}/reorder`, {
+    method: 'PUT',
+    body: JSON.stringify({ items }),
+  }),
 }
