@@ -1,8 +1,11 @@
+# syntax=docker/dockerfile:1
+
 # Stage 1: Build frontend assets
 FROM node:20-alpine AS frontend-build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
 COPY index.html vite.config.js postcss.config.js tailwind.config.js ./
 COPY public/ ./public/
 COPY src/ ./src/
@@ -11,9 +14,11 @@ RUN npm run build
 # Stage 2: Install production dependencies (needs build tools for better-sqlite3)
 FROM node:20-alpine AS deps
 WORKDIR /app
-RUN apk add --no-cache python3 make g++
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk add python3 make g++
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
 
 # Stage 3: Final minimal runtime image
 FROM node:20-alpine
