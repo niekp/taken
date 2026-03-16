@@ -19,12 +19,28 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
   const [dayStatuses, setDayStatuses] = useState({})
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState(() => {
+    try {
+      return localStorage.getItem('weekFilter') || 'all'
+    } catch { return 'all' }
+  })
   const [resetKey, setResetKey] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [statusForm, setStatusForm] = useState(null) // { date, id?, label?, color? }
   const [postponeTarget, setPostponeTarget] = useState(null) // task to postpone (opens date picker)
   const toast = useToast()
+
+  // Persist person filter
+  useEffect(() => {
+    try { localStorage.setItem('weekFilter', filter) } catch {}
+  }, [filter])
+
+  // Reset filter if saved user no longer exists
+  useEffect(() => {
+    if (filter !== 'all' && users.length > 0 && !users.find(u => u.id === filter)) {
+      setFilter('all')
+    }
+  }, [filter, users])
 
   // ─── Optimistic offline state ──────────────────────────────────────────
   // Persisted to localStorage so pending items survive page refresh.

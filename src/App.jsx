@@ -28,7 +28,11 @@ export default function App() {
     return 'weekly'
   })
   const [showMenu, setShowMenu] = useState(false)
-  const [openListId, setOpenListId] = useState(null)
+  const [openListId, setOpenListId] = useState(() => {
+    try {
+      return localStorage.getItem('openListId') || null
+    } catch { return null }
+  })
   const [showStats, setShowStats] = useState(false)
   const [showUserManagement, setShowUserManagement] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -126,6 +130,14 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('activeTab', view) } catch {}
   }, [view])
+
+  // Persist open list
+  useEffect(() => {
+    try {
+      if (openListId) localStorage.setItem('openListId', openListId)
+      else localStorage.removeItem('openListId')
+    } catch {}
+  }, [openListId])
 
   async function loadUsers() {
     try {
@@ -320,7 +332,7 @@ export default function App() {
       <div className="fixed bottom-0 left-0 right-0 z-30 glass border-t border-gray-200">
         <div className="flex">
           <button
-            onClick={() => { setView('weekly'); setOpenListId(null) }}
+            onClick={() => { setView('weekly') }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'weekly' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -331,7 +343,7 @@ export default function App() {
             <span className="text-xs font-medium">Week</span>
           </button>
           <button
-            onClick={() => { setView('meals'); setOpenListId(null) }}
+            onClick={() => { setView('meals') }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'meals' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -343,7 +355,7 @@ export default function App() {
           </button>
           {bringEnabled && (
             <button
-              onClick={() => { setView('grocery'); setOpenListId(null) }}
+              onClick={() => { setView('grocery') }}
               className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
                 view === 'grocery' ? 'text-accent-mint' : 'text-gray-400'
               }`}
@@ -355,7 +367,7 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={() => { setView('future'); setOpenListId(null) }}
+            onClick={() => { setView('future') }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'future' ? 'text-accent-mint' : 'text-gray-400'
             }`}
