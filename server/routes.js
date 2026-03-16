@@ -8,6 +8,7 @@ import * as dailyScheduleController from './controllers/dailyScheduleController.
 import * as dayStatusController from './controllers/dayStatusController.js'
 import * as calendarController from './controllers/calendarController.js'
 import * as pushController from './controllers/pushController.js'
+import * as listController from './controllers/listController.js'
 import { sseHandler, revisionHandler } from './lib/liveSync.js'
 import { requireAuth } from './middleware/auth.js'
 
@@ -101,5 +102,18 @@ router.post('/push/subscribe', pushController.subscribe)
 router.post('/push/unsubscribe', pushController.unsubscribe)
 router.put('/push/settings', pushController.updateSettings)
 router.post('/push/test', pushController.test)
+
+// Lists (notes + packing lists)
+router.get('/lists', listController.list)
+router.post('/lists', listController.create)
+router.get('/lists/:id', listController.get)
+router.put('/lists/:id', listController.update)
+router.delete('/lists/:id', listController.remove)
+router.post('/lists/:id/copy', listController.copy)
+router.post('/lists/:id/import', listController.importMarkdown)
+router.post('/lists/:id/items', listController.addItem)
+router.put('/lists/:id/items/:itemId', listController.updateItem)
+router.delete('/lists/:id/items/:itemId', listController.removeItem)
+router.post('/lists/:id/items/:itemId/to-task', listController.itemToTask)
 
 export default router

@@ -319,4 +319,52 @@ export const api = {
   syncCalendar: () => request('/calendar/sync', {
     method: 'POST',
   }),
+
+  // Lists (notes + packing lists)
+  getLists: (type) => request(type ? `/lists?type=${type}` : '/lists'),
+
+  getList: (id) => request(`/lists/${id}`),
+
+  createList: (data) => request('/lists', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  updateList: (id, data) => request(`/lists/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  deleteList: (id) => request(`/lists/${id}`, {
+    method: 'DELETE',
+  }),
+
+  copyList: (id, title) => request(`/lists/${id}/copy`, {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  }),
+
+  importListMarkdown: (id, markdown) => request(`/lists/${id}/import`, {
+    method: 'POST',
+    body: JSON.stringify({ markdown }),
+  }),
+
+  addListItem: (listId, data) => request(`/lists/${listId}/items`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  updateListItem: (listId, itemId, data) => request(`/lists/${listId}/items/${itemId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  deleteListItem: (listId, itemId) => request(`/lists/${listId}/items/${itemId}`, {
+    method: 'DELETE',
+  }),
+
+  listItemToTask: (listId, itemId, data) => request(`/lists/${listId}/items/${itemId}/to-task`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 }

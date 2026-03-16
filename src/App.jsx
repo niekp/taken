@@ -8,6 +8,8 @@ import MealsView from './components/MealsView'
 import GroceryView from './components/GroceryView'
 import DagschemaView from './components/DagschemaView'
 import FutureView from './components/FutureView'
+import ListsView from './components/ListsView'
+import ListView from './components/ListView'
 import Menu from './components/Menu'
 import Stats from './components/Stats'
 import Confetti from './components/Confetti'
@@ -21,11 +23,12 @@ export default function App() {
   const [view, setView] = useState(() => {
     try {
       const saved = localStorage.getItem('activeTab')
-      if (saved && ['weekly', 'meals', 'future', 'grocery', 'dagschema'].includes(saved)) return saved
+      if (saved && ['weekly', 'meals', 'future', 'grocery', 'dagschema', 'lists'].includes(saved)) return saved
     } catch {}
     return 'weekly'
   })
   const [showMenu, setShowMenu] = useState(false)
+  const [openListId, setOpenListId] = useState(null)
   const [showStats, setShowStats] = useState(false)
   const [showUserManagement, setShowUserManagement] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -295,12 +298,28 @@ export default function App() {
           users={users}
           onBack={() => setView('weekly')}
         />
+      ) : view === 'lists' ? (
+        openListId ? (
+          <ListView
+            listId={openListId}
+            currentUser={currentUser}
+            users={users}
+            onBack={() => setOpenListId(null)}
+          />
+        ) : (
+          <ListsView
+            currentUser={currentUser}
+            users={users}
+            onOpenMenu={() => setShowMenu(true)}
+            onOpenList={(id) => setOpenListId(id)}
+          />
+        )
       ) : null}
 
       <div className="fixed bottom-0 left-0 right-0 z-30 glass border-t border-gray-200">
         <div className="flex">
           <button
-            onClick={() => setView('weekly')}
+            onClick={() => { setView('weekly'); setOpenListId(null) }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'weekly' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -311,7 +330,7 @@ export default function App() {
             <span className="text-xs font-medium">Week</span>
           </button>
           <button
-            onClick={() => setView('meals')}
+            onClick={() => { setView('meals'); setOpenListId(null) }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'meals' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -323,7 +342,7 @@ export default function App() {
           </button>
           {bringEnabled && (
             <button
-              onClick={() => setView('grocery')}
+              onClick={() => { setView('grocery'); setOpenListId(null) }}
               className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
                 view === 'grocery' ? 'text-accent-mint' : 'text-gray-400'
               }`}
@@ -335,7 +354,7 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={() => setView('future')}
+            onClick={() => { setView('future'); setOpenListId(null) }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'future' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -344,6 +363,17 @@ export default function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
             <span className="text-xs font-medium">Toekomst</span>
+          </button>
+          <button
+            onClick={() => { setView('lists'); setOpenListId(null) }}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
+              view === 'lists' ? 'text-accent-mint' : 'text-gray-400'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            <span className="text-xs font-medium">Lijsten</span>
           </button>
         </div>
       </div>
