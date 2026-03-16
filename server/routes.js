@@ -76,6 +76,10 @@ router.post('/bring/items', bringController.addItem)
 router.post('/bring/items/complete', bringController.completeItem)
 router.post('/bring/items/remove', bringController.removeItem)
 
+// Grocery cache (served from DB, synced from Bring in background)
+router.get('/grocery/items', bringController.getCachedItems)
+router.post('/grocery/sync', bringController.triggerSync)
+
 // Daily schedules (static routes before parameterized)
 router.get('/daily-schedules/entries', dailyScheduleController.entriesForRange)
 router.get('/daily-schedules/labels', dailyScheduleController.labels)

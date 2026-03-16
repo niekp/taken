@@ -23,7 +23,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     try {
       const saved = localStorage.getItem('activeTab')
-      if (saved && ['weekly', 'meals', 'future', 'grocery', 'dagschema', 'lists'].includes(saved)) return saved
+      if (saved && ['weekly', 'future', 'grocery', 'lists', 'dagschema'].includes(saved)) return saved
     } catch {}
     return 'weekly'
   })
@@ -33,6 +33,7 @@ export default function App() {
       return localStorage.getItem('openListId') || null
     } catch { return null }
   })
+  const [showMealsFromGrocery, setShowMealsFromGrocery] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showUserManagement, setShowUserManagement] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -120,8 +121,12 @@ export default function App() {
   }, [])
 
   // If saved tab was 'grocery' but Bring is disabled, fall back to weekly
+  // Also redirect legacy 'meals' tab to weekly (meals is now accessed from within grocery)
   useEffect(() => {
     if (view === 'grocery' && bringEnabled === false) {
+      setView('weekly')
+    }
+    if (view === 'meals') {
       setView('weekly')
     }
   }, [bringEnabled])
@@ -282,15 +287,19 @@ export default function App() {
           onComplete={handleComplete}
           onOpenMenu={() => setShowMenu(true)}
         />
-      ) : view === 'meals' ? (
-        <MealsView
-          users={users}
-          onOpenMenu={() => setShowMenu(true)}
-        />
       ) : view === 'grocery' ? (
-        <GroceryView
-          onOpenMenu={() => setShowMenu(true)}
-        />
+        showMealsFromGrocery ? (
+          <MealsView
+            users={users}
+            onOpenMenu={() => setShowMenu(true)}
+            onBack={() => setShowMealsFromGrocery(false)}
+          />
+        ) : (
+          <GroceryView
+            onOpenMenu={() => setShowMenu(true)}
+            onOpenMeals={() => setShowMealsFromGrocery(true)}
+          />
+        )
       ) : view === 'future' ? (
         <FutureView
           currentUser={currentUser}
@@ -332,7 +341,7 @@ export default function App() {
       <div className="fixed bottom-0 left-0 right-0 z-30 glass border-t border-gray-200">
         <div className="flex">
           <button
-            onClick={() => { setView('weekly') }}
+            onClick={() => { setView('weekly'); setShowMealsFromGrocery(false) }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'weekly' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -342,20 +351,9 @@ export default function App() {
             </svg>
             <span className="text-xs font-medium">Week</span>
           </button>
-          <button
-            onClick={() => { setView('meals') }}
-            className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-              view === 'meals' ? 'text-accent-mint' : 'text-gray-400'
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
-            </svg>
-            <span className="text-xs font-medium">Eten</span>
-          </button>
           {bringEnabled && (
             <button
-              onClick={() => { setView('grocery') }}
+              onClick={() => { setView('grocery'); setShowMealsFromGrocery(false) }}
               className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
                 view === 'grocery' ? 'text-accent-mint' : 'text-gray-400'
               }`}
@@ -367,7 +365,7 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={() => { setView('future') }}
+            onClick={() => { setView('future'); setShowMealsFromGrocery(false) }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'future' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -376,6 +374,17 @@ export default function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
             <span className="text-xs font-medium">Toekomst</span>
+          </button>
+          <button
+            onClick={() => { setView('lists'); setShowMealsFromGrocery(false) }}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
+              view === 'lists' ? 'text-accent-mint' : 'text-gray-400'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            <span className="text-xs font-medium">Lijsten</span>
           </button>
         </div>
       </div>
@@ -402,6 +411,11 @@ export default function App() {
             setShowMenu(false)
             setView('lists')
             setOpenListId(null)
+          }}
+          onOpenMeals={() => {
+            setShowMenu(false)
+            setView('grocery')
+            setShowMealsFromGrocery(true)
           }}
           onOpenUserManagement={() => {
             setShowMenu(false)

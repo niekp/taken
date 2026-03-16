@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { api } from '../lib/api'
 import { getUserColor } from '../lib/colors'
 
-export default function Menu({ onClose, onLogout, currentUser, onUpdateUser, onOpenStats, onOpenDagschema, onOpenSchedules, onOpenLijsten, onOpenUserManagement, onOpenNotifications }) {
+export default function Menu({ onClose, onLogout, currentUser, onUpdateUser, onOpenStats, onOpenDagschema, onOpenSchedules, onOpenLijsten, onOpenMeals, onOpenUserManagement, onOpenNotifications }) {
   const [showChangePin, setShowChangePin] = useState(false)
   const [currentPin, setCurrentPin] = useState('')
   const [newPin, setNewPin] = useState('')
@@ -88,6 +88,18 @@ export default function Menu({ onClose, onLogout, currentUser, onUpdateUser, onO
       iconBg: 'bg-pastel-mint',
       closeOnClick: true,
     },
+    ...(onOpenMeals ? [{
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
+        </svg>
+      ),
+      label: 'Eten plannen',
+      onClick: onOpenMeals,
+      bg: 'bg-pastel-peach/30',
+      iconBg: 'bg-pastel-peach',
+      closeOnClick: true,
+    }] : []),
     {
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

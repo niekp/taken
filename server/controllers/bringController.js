@@ -1,9 +1,11 @@
 import { BringClient } from '../lib/bring.js'
 import * as bringRepo from '../repositories/bringRepository.js'
+import * as groceryRepo from '../repositories/groceryRepository.js'
 import { broadcast } from '../lib/liveSync.js'
 
 // Singleton client, lazily initialized
 let client = null
+let syncInProgress = false
 
 function getClient() {
   const config = bringRepo.getConfig()
@@ -34,6 +36,54 @@ async function ensureLoggedIn(c) {
   }
 }
 
+// ── Sync: fetch from Bring API and write to DB cache ───────────────
+// Exported so it can be called from cron and from endpoints.
+export async function syncFromBring() {
+  if (syncInProgress) return false
+  syncInProgress = true
+
+  try {
+    const c = getClient()
+    if (!c) return false
+
+    const config = bringRepo.getConfig()
+    if (!config.list_uuid) return false
+
+    await ensureLoggedIn(c)
+    const items = await c.getItems(config.list_uuid)
+    groceryRepo.replaceAll(items.purchase, items.recently)
+    broadcast('grocery')
+    return true
+  } catch (err) {
+    console.error('Bring sync error:', err.message)
+    return false
+  } finally {
+    syncInProgress = false
+  }
+}
+
+// ── Cached endpoint: serve from DB ─────────────────────────────────
+
+// GET /api/grocery/items — instant from DB cache
+export function getCachedItems(req, res) {
+  const items = groceryRepo.getItems()
+  const lastSync = groceryRepo.getLastSyncTime()
+  res.json({ ...items, lastSync })
+}
+
+// POST /api/grocery/sync — trigger a background sync, return cached data immediately
+export async function triggerSync(req, res) {
+  // Return cached data right away
+  const items = groceryRepo.getItems()
+  const lastSync = groceryRepo.getLastSyncTime()
+  res.json({ ...items, lastSync })
+
+  // Sync in background (don't await in the response)
+  syncFromBring().catch(() => {})
+}
+
+// ── Existing Bring endpoints (unchanged for config/catalog) ────────
+
 // GET /api/bring/status — is Bring configured + which list?
 export function status(req, res) {
   const config = bringRepo.getConfig()
@@ -48,7 +98,7 @@ export function status(req, res) {
   })
 }
 
-// GET /api/bring/items — get shopping list items
+// GET /api/bring/items — get shopping list items (direct from Bring API)
 export async function getItems(req, res) {
   try {
     const c = getClient()
@@ -67,6 +117,7 @@ export async function getItems(req, res) {
 }
 
 // POST /api/bring/items — add item { name, specification? }
+// Write-through: Bring API + DB cache sync
 export async function addItem(req, res) {
   try {
     const c = getClient()
@@ -80,7 +131,9 @@ export async function addItem(req, res) {
 
     await ensureLoggedIn(c)
     await c.addItem(config.list_uuid, name, specification || '', uuid || null)
-    broadcast('grocery')
+
+    // Sync DB cache from Bring (gets the canonical state including the new item)
+    await syncFromBring()
     res.json({ success: true })
   } catch (err) {
     console.error('Bring addItem error:', err.message)
@@ -102,7 +155,8 @@ export async function completeItem(req, res) {
 
     await ensureLoggedIn(c)
     await c.completeItem(config.list_uuid, name, uuid)
-    broadcast('grocery')
+
+    await syncFromBring()
     res.json({ success: true })
   } catch (err) {
     console.error('Bring completeItem error:', err.message)
@@ -124,7 +178,8 @@ export async function removeItem(req, res) {
 
     await ensureLoggedIn(c)
     await c.removeItem(config.list_uuid, name, uuid)
-    broadcast('grocery')
+
+    await syncFromBring()
     res.json({ success: true })
   } catch (err) {
     console.error('Bring removeItem error:', err.message)

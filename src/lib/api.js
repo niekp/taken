@@ -246,6 +246,13 @@ export const api = {
     body: JSON.stringify({ name, uuid }),
   }),
 
+  // Grocery cache (instant load from DB, background sync from Bring)
+  getGroceryItems: () => request('/grocery/items'),
+
+  triggerGrocerySync: () => request('/grocery/sync', {
+    method: 'POST',
+  }),
+
   // Daily schedules (Dagschema)
   getDailySchedules: () => request('/daily-schedules'),
 

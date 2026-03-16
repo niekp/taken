@@ -37,7 +37,7 @@ function ItemImage({ src, alt, className = '' }) {
   )
 }
 
-export default function GroceryView({ onOpenMenu }) {
+export default function GroceryView({ onOpenMenu, onOpenMeals }) {
   const [items, setItems] = useState([])
   const [recentItems, setRecentItems] = useState([])
   const [meals, setMeals] = useState([])
@@ -117,11 +117,15 @@ export default function GroceryView({ onOpenMenu }) {
     loadItems()
     loadMeals()
     loadCatalog()
+    // Trigger background sync from Bring → DB cache on mount
+    api.triggerGrocerySync().catch(() => {})
 
     function handleVisibilityChange() {
       if (!document.hidden) {
+        // On re-focus: load from DB cache (instant), then trigger Bring sync
         loadItems()
         loadMeals()
+        api.triggerGrocerySync().catch(() => {})
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -130,7 +134,7 @@ export default function GroceryView({ onOpenMenu }) {
 
   async function loadItems() {
     try {
-      const data = await api.getBringItems()
+      const data = await api.getGroceryItems()
       setItems(data.purchase || [])
       setRecentItems(data.recently || [])
       setError(null)
@@ -143,7 +147,7 @@ export default function GroceryView({ onOpenMenu }) {
 
   /** Background sync — merges server state into local order to prevent shuffling */
   function syncItems() {
-    api.getBringItems()
+    api.getGroceryItems()
       .then(data => {
         const serverPurchase = data.purchase || []
         const serverRecent = data.recently || []
@@ -443,51 +447,89 @@ export default function GroceryView({ onOpenMenu }) {
         </div>
       ) : (
         <div className="px-4 py-4 pb-44 space-y-3">
-          {/* Upcoming meals - collapsible */}
-          {meals.length > 0 && (() => {
+          {/* Upcoming meals - collapsible + Eten plannen shortcut */}
+          {(() => {
             const today = new Date()
             today.setHours(0, 0, 0, 0)
             const todayISO = formatDateISO(today)
             const todayMeal = meals.find(m => m.date === todayISO)
+            const hasMeals = meals.length > 0
             return (
-              <button
-                onClick={() => setShowMeals(!showMeals)}
-                className="w-full bg-white/70 rounded-2xl shadow-card px-4 py-2.5 text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <svg
-                    className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${showMeals ? 'rotate-90' : ''}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Maaltijden</p>
-                  {!showMeals && todayMeal && (
-                    <p className="text-xs text-gray-500 truncate ml-auto">
-                      <span className="text-accent-mint font-semibold">Nu</span>{' '}
-                      {todayMeal.meal_name}
-                    </p>
-                  )}
-                </div>
-                {showMeals && (
-                  <div className="space-y-1 mt-2">
-                    {meals.map(meal => {
-                      const mealDate = new Date(meal.date + 'T00:00:00')
-                      const isToday = meal.date === todayISO
-                      return (
-                        <div key={meal.id} className="flex items-center gap-2 min-w-0">
-                          <span className={`text-xs font-semibold w-6 flex-shrink-0 ${isToday ? 'text-accent-mint' : 'text-gray-400'}`}>
-                            {isToday ? 'Nu' : DAY_SHORT[mealDate.getDay()]}
-                          </span>
-                          <span className={`text-sm truncate ${isToday ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
-                            {meal.meal_name}
-                          </span>
+              <div className="w-full bg-white/70 rounded-2xl shadow-card text-left">
+                {hasMeals ? (
+                  <>
+                    <button
+                      onClick={() => setShowMeals(!showMeals)}
+                      className="w-full px-4 py-2.5"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg
+                          className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${showMeals ? 'rotate-90' : ''}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Maaltijden</p>
+                        {!showMeals && todayMeal && (
+                          <p className="text-xs text-gray-500 truncate ml-auto">
+                            <span className="text-accent-mint font-semibold">Nu</span>{' '}
+                            {todayMeal.meal_name}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                    {showMeals && (
+                      <div className="px-4 pb-3">
+                        <div className="space-y-1">
+                          {meals.map(meal => {
+                            const mealDate = new Date(meal.date + 'T00:00:00')
+                            const isToday = meal.date === todayISO
+                            return (
+                              <div key={meal.id} className="flex items-center gap-2 min-w-0">
+                                <span className={`text-xs font-semibold w-6 flex-shrink-0 ${isToday ? 'text-accent-mint' : 'text-gray-400'}`}>
+                                  {isToday ? 'Nu' : DAY_SHORT[mealDate.getDay()]}
+                                </span>
+                                <span className={`text-sm truncate ${isToday ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
+                                  {meal.meal_name}
+                                </span>
+                              </div>
+                            )
+                          })}
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </button>
+                        {onOpenMeals && (
+                          <button
+                            onClick={onOpenMeals}
+                            className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-accent-mint/10 text-accent-mint text-xs font-medium transition-colors active:bg-accent-mint/20"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
+                            </svg>
+                            Eten plannen
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : onOpenMeals ? (
+                  <button
+                    onClick={onOpenMeals}
+                    className="w-full flex items-center gap-3 px-4 py-3"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-accent-mint/10 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-accent-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
+                      </svg>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-700">Eten plannen</p>
+                      <p className="text-xs text-gray-400">Nog geen maaltijden gepland</p>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-300 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
             )
           })()}
 

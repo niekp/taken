@@ -10,6 +10,7 @@ import { syncCalendar } from './lib/calendar.js'
 import * as sessionRepo from './repositories/sessionRepository.js'
 import { runHousekeeping } from './repositories/taskRepository.js'
 import { broadcast } from './lib/liveSync.js'
+import { syncFromBring } from './controllers/bringController.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -104,8 +105,18 @@ cron.schedule('0 * * * *', () => {
   }
 })
 
+// Cron: every 5 minutes, sync grocery list from Bring
+cron.schedule('*/5 * * * *', () => {
+  syncFromBring().catch(err => {
+    console.error('Error syncing grocery list:', err.message)
+  })
+})
+
 // Initial calendar sync on startup (non-blocking)
 syncCalendar().catch(() => {})
+
+// Initial grocery sync from Bring on startup (non-blocking)
+syncFromBring().catch(() => {})
 
 // Initial housekeeping on startup (move overdue tasks to today)
 try {
