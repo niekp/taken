@@ -306,7 +306,6 @@ export default function App() {
           users={users}
           calendarEnabled={!!calendarEnabled}
           onOpenMenu={() => setShowMenu(true)}
-          onOpenLijsten={() => { setView('lists'); setOpenListId(null) }}
           onComplete={handleComplete}
         />
       ) : view === 'dagschema' ? (
@@ -406,11 +405,6 @@ export default function App() {
           onOpenSchedules={() => {
             setShowMenu(false)
             setView('schedules')
-          }}
-          onOpenLijsten={() => {
-            setShowMenu(false)
-            setView('lists')
-            setOpenListId(null)
           }}
           onOpenMeals={() => {
             setShowMenu(false)

@@ -39,7 +39,7 @@ function isTomorrow(dateStr) {
   return dateStr === formatDateISO(t)
 }
 
-export default function FutureView({ currentUser, users, calendarEnabled, onOpenMenu, onOpenLijsten, onComplete }) {
+export default function FutureView({ currentUser, users, calendarEnabled, onOpenMenu, onComplete }) {
   const toast = useToast()
   const [tasks, setTasks] = useState([])
   const [ghosts, setGhosts] = useState([])
@@ -366,22 +366,6 @@ export default function FutureView({ currentUser, users, calendarEnabled, onOpen
 
       {/* Timeline */}
       <div className="px-4 pt-3 space-y-4">
-        {/* Lijsten shortcut */}
-        <button
-          onClick={onOpenLijsten}
-          className="w-full flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-card hover:shadow-card-hover transition-shadow"
-        >
-          <div className="w-8 h-8 rounded-lg bg-pastel-lavender flex items-center justify-center">
-            <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-          </div>
-          <span className="text-sm font-medium text-gray-700">Lijsten</span>
-          <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-
         {dates.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-card">
