@@ -105,8 +105,8 @@ cron.schedule('0 * * * *', () => {
   }
 })
 
-// Cron: every 5 minutes, sync grocery list from Bring
-cron.schedule('*/5 * * * *', () => {
+// Cron: every 30 minutes, sync grocery list from Bring
+cron.schedule('*/30 * * * *', () => {
   syncFromBring().catch(err => {
     console.error('Error syncing grocery list:', err.message)
   })
