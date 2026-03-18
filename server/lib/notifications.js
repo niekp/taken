@@ -90,7 +90,7 @@ export function buildSummary(userId) {
   }
 
   return {
-    title: 'Huishouden',
+    title: 'Huis',
     body: parts.join(', '),
   }
 }

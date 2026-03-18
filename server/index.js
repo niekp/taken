@@ -126,5 +126,5 @@ try {
 }
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Huishouden server running on port ${PORT}`)
+  console.log(`Huis server running on port ${PORT}`)
 })

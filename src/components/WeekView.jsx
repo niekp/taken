@@ -595,7 +595,7 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
             </svg>
           </button>
 
-          <h1 className="text-lg font-semibold text-gray-800">Huishouden</h1>
+          <h1 className="text-lg font-semibold text-gray-800">Huis</h1>
 
           {/* User legend for desktop — fills the header right side */}
           <div className="hidden md:flex items-center gap-2.5 text-sm text-gray-500">

@@ -19,9 +19,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon512_rounded.png', 'icons/icon512_maskable.png'],
       manifest: {
-        name: 'Huishouden',
-        short_name: 'Huishouden',
-        description: 'Takenlijst app voor het huishouden',
+        name: 'Huis',
+        short_name: 'Huis',
+        description: 'Huisbeheer app voor taken, planning en meer',
         start_url: '/',
         display: 'standalone',
         background_color: '#FEFDFB',

@@ -79,7 +79,7 @@ draw_header() {
 
   echo -e "${C_CYAN}${C_BOLD}"
   center "┌─────────────────────────────────┐"
-  center "│     Huishouden  ·  Beheer       │"
+  center "│       Huis  ·  Beheer           │"
   center "└─────────────────────────────────┘"
   echo -e "${C_RESET}"
   center "${C_DIM}compose: ${COMPOSE_FILE}${C_RESET}"

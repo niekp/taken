@@ -9,7 +9,7 @@
 
 import { openDB } from 'idb'
 
-const DB_NAME = 'huishouden-offline'
+const DB_NAME = 'huis-offline'
 const DB_VERSION = 1
 
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days

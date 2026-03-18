@@ -21,7 +21,7 @@ const command = args[0]
 
 function usage() {
   console.log(`
-Huishouden CLI - User & Bring! Management
+Huis CLI - User & Bring! Management
 
 Usage:
   node server/cli.js <command> [options]

@@ -148,10 +148,10 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data.json()
   } catch {
-    data = { title: 'Huishouden', body: event.data.text() }
+    data = { title: 'Huis', body: event.data.text() }
   }
 
-  const title = data.title || 'Huishouden'
+  const title = data.title || 'Huis'
   const options = {
     body: data.body || '',
     icon: '/icons/icon512_rounded.png',

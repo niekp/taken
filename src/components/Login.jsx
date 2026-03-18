@@ -96,10 +96,11 @@ export default function Login({ onLogin, onSelectUser, users }) {
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pastel-mint to-pastel-lavender rounded-[1.5rem] mb-4 shadow-soft">
             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11.5l2 2 4-4" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Huishouden</h1>
+          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Huis</h1>
         </div>
         
         <div className="space-y-4 w-full">
