@@ -36,7 +36,7 @@ function DroppableCategory({ id, children }) {
 }
 
 // ── Sortable item component ────────────────────────────────────────
-function SortableItem({ item, listType, onToggle, onDelete, onToTask, isDragMode }) {
+function SortableItem({ item, listType, onToggle, onDelete, onToTask, onEdit, isEditing, editValue, onEditChange, onEditSave, isDragMode }) {
   const {
     attributes,
     listeners,
@@ -89,11 +89,30 @@ function SortableItem({ item, listType, onToggle, onDelete, onToTask, isDragMode
           </svg>
         ) : null}
       </button>
-      <span className={`flex-1 text-sm ${
-        item.checked ? 'text-gray-400 line-through' : 'text-gray-700'
-      }`}>
-        {item.title}
-      </span>
+      {isEditing ? (
+        <input
+          type="text"
+          value={editValue}
+          onChange={e => onEditChange(e.target.value)}
+          onBlur={onEditSave}
+          onKeyDown={e => {
+            if (e.key === 'Enter') onEditSave()
+            if (e.key === 'Escape') onEditSave()
+          }}
+          className="flex-1 text-sm bg-transparent border-b-2 border-accent-mint outline-none text-gray-700 py-0"
+          autoFocus
+          onClick={e => e.stopPropagation()}
+        />
+      ) : (
+        <span
+          className={`flex-1 text-sm cursor-pointer ${
+            item.checked ? 'text-gray-400 line-through' : 'text-gray-700'
+          }`}
+          onClick={() => onEdit(item)}
+        >
+          {item.title}
+        </span>
+      )}
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {listType === 'notes' && !item.checked && (
           <button
@@ -163,6 +182,9 @@ export default function ListView({ listId, currentUser, users, onBack }) {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })
+  // Item editing state
+  const [editingItemId, setEditingItemId] = useState(null) // item id being edited
+  const [editItemValue, setEditItemValue] = useState('')
   // Category editing state
   const [editingCategory, setEditingCategory] = useState(null) // category name being edited
   const [editCategoryValue, setEditCategoryValue] = useState('')
@@ -307,6 +329,30 @@ export default function ListView({ listId, currentUser, users, onBack }) {
       console.error('Failed to delete item:', err)
       if (isMutationQueued(err)) toast.info('Wordt gesynchroniseerd wanneer online')
       else toast.error('Verwijderen mislukt')
+    }
+  }
+
+  function handleStartEditItem(item) {
+    setEditingItemId(item.id)
+    setEditItemValue(item.title)
+  }
+
+  async function handleEditItemSave() {
+    const newTitle = editItemValue.trim()
+    const itemId = editingItemId
+    setEditingItemId(null)
+
+    if (!newTitle || !itemId) return
+    const item = currentItems.find(i => i.id === itemId)
+    if (!item || newTitle === item.title) return
+
+    try {
+      await api.updateListItem(listId, itemId, { title: newTitle })
+      loadList()
+    } catch (err) {
+      console.error('Failed to edit item:', err)
+      if (isMutationQueued(err)) toast.info('Wordt gesynchroniseerd wanneer online')
+      else toast.error('Bewerken mislukt')
     }
   }
 
@@ -769,6 +815,11 @@ export default function ListView({ listId, currentUser, users, onBack }) {
                             onToggle={handleToggleItem}
                             onDelete={handleDeleteItem}
                             onToTask={handleItemToTask}
+                            onEdit={handleStartEditItem}
+                            isEditing={editingItemId === item.id}
+                            editValue={editItemValue}
+                            onEditChange={setEditItemValue}
+                            onEditSave={handleEditItemSave}
                           />
                         ))}
                       </SortableContext>
