@@ -858,6 +858,31 @@ agenda_menu() {
 
 # ── Notification Actions ────────────────────────────────────────────
 
+action_create_token() {
+  draw_header
+  echo -e "  ${C_BOLD}${C_WHITE}API Token aanmaken${C_RESET}"
+  echo -e "  ${C_DIM}$(hr '─' 40)${C_RESET}"
+  echo
+
+  local users_output
+  users_output=$(exec_cli list-users 2>&1) || true
+  echo -e "$users_output" | sed 's/^/    /'
+  echo
+
+  local name
+  input_text name "Naam"
+  [[ -z "$name" ]] && return
+
+  local token
+  token=$(exec_cli create-token "$name" 2>&1) || true
+
+  if [[ ${#token} -eq 64 ]]; then
+    show_output "API Token" "${C_GREEN}Token aangemaakt voor ${name}:${C_RESET}\n\n${C_BOLD}${token}${C_RESET}\n\n${C_DIM}Voeg dit toe aan skills/config.json${C_RESET}"
+  else
+    show_output "Fout" "${C_RED}${token}${C_RESET}"
+  fi
+}
+
 action_generate_vapid() {
   draw_header
   echo -e "  ${C_BOLD}${C_WHITE}VAPID Keys Genereren${C_RESET}"

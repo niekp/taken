@@ -2,6 +2,7 @@
 
 import { initDb } from './db.js'
 import * as userRepo from './repositories/userRepository.js'
+import * as sessionRepo from './repositories/sessionRepository.js'
 import * as bringRepo from './repositories/bringRepository.js'
 import * as calendarRepo from './repositories/calendarRepository.js'
 import { BringClient } from './lib/bring.js'
@@ -45,6 +46,9 @@ Calendar Commands:
   calendar-status                     Show current calendar configuration
   calendar-remove                     Remove calendar configuration and events
   calendar-sync                       Manually trigger a calendar sync
+
+Token Commands:
+  create-token <name>                 Create an API token for a user (for AI skills)
 
 Setup Commands:
   generate-vapid-keys                 Generate VAPID keys for push notifications
@@ -437,6 +441,29 @@ async function main() {
         console.error(`Sync failed: ${err.message}`)
         process.exit(1)
       }
+      break
+    }
+
+    case 'create-token': {
+      const name = args[1]
+      if (!name) {
+        console.error('Usage: create-token <name>')
+        console.log('\nAvailable users:')
+        const users = userRepo.findAllWithIdAndName()
+        for (const user of users) {
+          console.log(`  ${user.name}`)
+        }
+        process.exit(1)
+      }
+
+      const user = userRepo.findByName(name)
+      if (!user) {
+        console.error(`Error: User "${name}" not found`)
+        process.exit(1)
+      }
+
+      const session = sessionRepo.create(user.id)
+      console.log(session.token)
       break
     }
 
