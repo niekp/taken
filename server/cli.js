@@ -69,6 +69,7 @@ Examples:
   node server/cli.js calendar-set-url "https://calendar.google.com/calendar/ical/xxx/basic.ics"
   node server/cli.js calendar-status
   node server/cli.js calendar-sync
+  node server/cli.js create-token "Alice"
 `)
 }
 

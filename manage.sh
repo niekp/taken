@@ -919,7 +919,8 @@ main_menu() {
         "Gebruikersbeheer|Gebruikers beheren en PINs wijzigen" \
         "Bring! Instellingen|Boodschappenlijst koppelen" \
         "Notificaties|Push notificaties instellen" \
-        "Agenda|Google Agenda koppelen"; then
+        "Agenda|Google Agenda koppelen" \
+        "API Token|Token aanmaken voor AI skills"; then
         cleanup
         exit 0
       fi
@@ -929,6 +930,7 @@ main_menu() {
         1) bring_menu ;;
         2) notification_menu ;;
         3) agenda_menu ;;
+        4) check_running && action_create_token ;;
       esac
     else
       if ! menu_select choice "Hoofdmenu" \
@@ -936,6 +938,7 @@ main_menu() {
         "Bring! Instellingen|Boodschappenlijst koppelen" \
         "Notificaties|Push notificaties instellen" \
         "Agenda|Google Agenda koppelen" \
+        "API Token|Token aanmaken voor AI skills" \
         "Status|Container status bekijken" \
         "Logs bekijken|Live logboek volgen" \
         "Database backup|Maak een kopie van de database" \
@@ -950,11 +953,12 @@ main_menu() {
         1) bring_menu ;;
         2) notification_menu ;;
         3) agenda_menu ;;
-        4) action_status ;;
-        5) action_logs ;;
-        6) check_running && action_backup ;;
-        7) action_restart ;;
-        8) action_update ;;
+        4) check_running && action_create_token ;;
+        5) action_status ;;
+        6) action_logs ;;
+        7) check_running && action_backup ;;
+        8) action_restart ;;
+        9) action_update ;;
       esac
     fi
   done
