@@ -176,7 +176,15 @@ export default function ListView({ listId, currentUser, users, onBack }) {
   const [newItemText, setNewItemText] = useState({}) // { [category]: text }
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
-  const [collapsedCategories, setCollapsedCategories] = useState({})
+  const [collapsedCategories, setCollapsedCategories] = useState(() => {
+    try {
+      const stored = localStorage.getItem('list-collapsed-categories')
+      const all = stored ? JSON.parse(stored) : {}
+      return all[listId] || {}
+    } catch {
+      return {}
+    }
+  })
   const [toTaskItem, setToTaskItem] = useState(null)
   const [taskDate, setTaskDate] = useState(() => {
     const d = new Date()
@@ -385,10 +393,15 @@ export default function ListView({ listId, currentUser, users, onBack }) {
   }
 
   function toggleCollapse(category) {
-    setCollapsedCategories(prev => ({
-      ...prev,
-      [category]: !prev[category],
-    }))
+    setCollapsedCategories(prev => {
+      const next = { ...prev, [category]: !prev[category] }
+      try {
+        const stored = localStorage.getItem('list-collapsed-categories')
+        const all = stored ? JSON.parse(stored) : {}
+        localStorage.setItem('list-collapsed-categories', JSON.stringify({ ...all, [listId]: next }))
+      } catch {}
+      return next
+    })
   }
 
   // ── Category editing handlers ────────────────────────────────────
