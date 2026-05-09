@@ -22,6 +22,30 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useDroppable } from '@dnd-kit/core'
 
+// ── Sortable category row ─────────────────────────────────────────
+function SortableCategoryRow({ category, children }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: `cat-sort:${category}`,
+    data: { type: 'category', category },
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
+    >
+      {children(attributes, listeners)}
+    </div>
+  )
+}
+
 // ── Droppable category wrapper (makes empty categories droppable) ───
 function DroppableCategory({ id, children }) {
   const { setNodeRef, isOver } = useDroppable({ id })
@@ -200,12 +224,19 @@ export default function ListView({ listId, currentUser, users, onBack }) {
   const [deletingCategory, setDeletingCategory] = useState(null) // category being confirmed for deletion
   const [deleteMoveTarget, setDeleteMoveTarget] = useState('__delete__') // where to move items on delete
 
+  // Category order state (persisted to DB, seeded from list.category_order on load)
+  const [categoryOrder, setCategoryOrder] = useState([])
+  const [localCategoryOrder, setLocalCategoryOrder] = useState(null)
+  const [isDraggingCategory, setIsDraggingCategory] = useState(false)
+  const [activeCategoryName, setActiveCategoryName] = useState(null)
+
   // Drag state
   const [activeId, setActiveId] = useState(null)
   // Local item order for optimistic drag updates
   const [localItems, setLocalItems] = useState(null)
   // Ref to track drag state for liveSync gating
   const isDraggingRef = useRef(false)
+  const isDraggingCategoryRef = useRef(false)
 
   const toast = useToast()
   const titleInputRef = useRef(null)
@@ -232,6 +263,14 @@ export default function ListView({ listId, currentUser, users, onBack }) {
       setList(data)
       setTitleValue(data.title)
       setLocalItems(null)
+      if (!isDraggingCategoryRef.current) {
+        try {
+          setCategoryOrder(data.category_order ? JSON.parse(data.category_order) : [])
+        } catch {
+          setCategoryOrder([])
+        }
+        setLocalCategoryOrder(null)
+      }
     } catch (err) {
       console.error('Failed to load list:', err)
     }
@@ -265,7 +304,7 @@ export default function ListView({ listId, currentUser, users, onBack }) {
     }))
   }, [currentItems])
 
-  // Build display groups including empty categories
+  // Build display groups including empty categories, sorted by categoryOrder
   const displayGroups = useMemo(() => {
     const allCategories = new Set(grouped.map(g => g.category))
     Object.keys(newItemText).forEach(cat => allCategories.add(cat))
@@ -279,8 +318,20 @@ export default function ListView({ listId, currentUser, users, onBack }) {
         result.push({ category: cat, items: [], checkedCount: 0, totalCount: 0 })
       }
     }
+
+    const order = localCategoryOrder || categoryOrder
+    if (order.length) {
+      result.sort((a, b) => {
+        const ai = order.indexOf(a.category)
+        const bi = order.indexOf(b.category)
+        if (ai === -1 && bi === -1) return 0
+        if (ai === -1) return 1
+        if (bi === -1) return -1
+        return ai - bi
+      })
+    }
     return result
-  }, [grouped, newItemText])
+  }, [grouped, newItemText, localCategoryOrder, categoryOrder])
 
   // Find the active item for DragOverlay
   const activeItem = activeId ? currentItems.find(i => i.id === activeId) : null
@@ -481,15 +532,39 @@ export default function ListView({ listId, currentUser, users, onBack }) {
   }
 
   function handleDragStart(event) {
-    setActiveId(event.active.id)
-    isDraggingRef.current = true
-    // Snapshot current items for local manipulation
-    setLocalItems([...currentItems])
+    const type = event.active.data.current?.type
+    if (type === 'category') {
+      setIsDraggingCategory(true)
+      isDraggingCategoryRef.current = true
+      setActiveCategoryName(event.active.data.current.category)
+      setLocalCategoryOrder(displayGroups.map(g => g.category))
+    } else {
+      setActiveId(event.active.id)
+      isDraggingRef.current = true
+      setLocalItems([...currentItems])
+    }
   }
 
   function handleDragOver(event) {
     const { active, over } = event
-    if (!over || !localItems) return
+    if (!over) return
+
+    if (active.data.current?.type === 'category') {
+      const overId = String(over.id)
+      if (!overId.startsWith('cat-sort:') || active.id === over.id) return
+      const activeCat = String(active.id).slice('cat-sort:'.length)
+      const overCat = overId.slice('cat-sort:'.length)
+      setLocalCategoryOrder(prev => {
+        if (!prev) return prev
+        const oldIndex = prev.indexOf(activeCat)
+        const newIndex = prev.indexOf(overCat)
+        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev
+        return arrayMove(prev, oldIndex, newIndex)
+      })
+      return
+    }
+
+    if (!localItems) return
 
     const activeItemId = active.id
     const overId = over.id
@@ -566,7 +641,28 @@ export default function ListView({ listId, currentUser, users, onBack }) {
   }
 
   async function handleDragEnd(event) {
-    const { active, over } = event
+    const { active } = event
+
+    if (active.data.current?.type === 'category') {
+      const finalOrder = localCategoryOrder
+      setCategoryOrder(finalOrder || categoryOrder)
+      setLocalCategoryOrder(null)
+      setIsDraggingCategory(false)
+      isDraggingCategoryRef.current = false
+      setActiveCategoryName(null)
+      if (finalOrder) {
+        try {
+          await api.updateListCategoryOrder(listId, finalOrder)
+        } catch (err) {
+          console.error('Failed to save category order:', err)
+          if (isMutationQueued(err)) toast.info('Wordt gesynchroniseerd wanneer online')
+          else toast.error('Volgorde opslaan mislukt')
+        }
+      }
+      return
+    }
+
+    const { over } = event
     setActiveId(null)
     isDraggingRef.current = false
 
@@ -608,6 +704,10 @@ export default function ListView({ listId, currentUser, users, onBack }) {
     setActiveId(null)
     isDraggingRef.current = false
     setLocalItems(null)
+    setLocalCategoryOrder(null)
+    setIsDraggingCategory(false)
+    isDraggingCategoryRef.current = false
+    setActiveCategoryName(null)
   }
 
   // Custom collision detection: prefer items (pointerWithin), fall back to rect intersection for empty containers
@@ -717,206 +817,246 @@ export default function ListView({ listId, currentUser, users, onBack }) {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="space-y-5">
-            {displayGroups.map(group => {
-              const isCollapsed = collapsedCategories[group.category]
-              const itemIds = group.items.map(i => i.id)
-              const droppableId = `category:${group.category}`
+          <SortableContext
+            items={displayGroups.map(g => `cat-sort:${g.category}`)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-5">
+              {displayGroups.map(group => {
+                const isCollapsed = isDraggingCategory || collapsedCategories[group.category]
+                const itemIds = group.items.map(i => i.id)
+                const droppableId = `category:${group.category}`
+                const showHeader = group.category || displayGroups.length > 1
 
-              return (
-                <div key={group.category || '__uncategorized'}>
-                  {/* Category header */}
-                  {group.category ? (
-                    editingCategory === group.category ? (
-                      /* Inline rename */
-                      <div className="flex items-center gap-2 mb-2 px-1">
-                        <input
-                          ref={editCategoryRef}
-                          type="text"
-                          value={editCategoryValue}
-                          onChange={e => setEditCategoryValue(e.target.value)}
-                          onBlur={handleRenameCategorySave}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') handleRenameCategorySave()
-                            if (e.key === 'Escape') setEditingCategory(null)
-                          }}
-                          className="text-sm font-semibold text-gray-600 uppercase tracking-wider bg-white border border-accent-mint rounded-lg px-2 py-1 outline-none flex-1"
-                          autoFocus
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 mb-2 px-1 relative">
-                        <button
-                          onClick={() => toggleCollapse(group.category)}
-                          className="flex items-center gap-2 flex-1 text-left"
-                        >
-                          <svg
-                            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                            {group.category}
-                          </h2>
-                          {group.totalCount > 0 && (
-                            <span className="text-xs text-gray-300">
-                              {group.checkedCount}/{group.totalCount}
-                            </span>
-                          )}
-                        </button>
-
-                        {/* Category menu button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setCategoryMenu(categoryMenu === group.category ? null : group.category)
-                          }}
-                          className="p-1 rounded-lg hover:bg-white/60 transition-colors"
-                        >
-                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                            <circle cx="12" cy="6" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="18" r="2" />
-                          </svg>
-                        </button>
-
-                        {/* Category dropdown menu */}
-                        {categoryMenu === group.category && (
-                          <>
-                            <div className="fixed inset-0 z-40" onClick={() => setCategoryMenu(null)} />
-                            <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 z-50 py-1 min-w-[160px]">
-                              <button
-                                onClick={() => startRenameCategory(group.category)}
-                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                              >
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                                Hernoemen
-                              </button>
-                              <button
-                                onClick={() => startDeleteCategory(group.category)}
-                                className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                              >
-                                <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Verwijderen
-                              </button>
+                return (
+                  <SortableCategoryRow key={group.category || '__uncategorized'} category={group.category}>
+                    {(dragAttrs, dragListeners) => (
+                      <div>
+                        {/* Category header */}
+                        {showHeader && (
+                          editingCategory === group.category ? (
+                            /* Inline rename */
+                            <div className="flex items-center gap-2 mb-2 px-1">
+                              <input
+                                ref={editCategoryRef}
+                                type="text"
+                                value={editCategoryValue}
+                                onChange={e => setEditCategoryValue(e.target.value)}
+                                onBlur={handleRenameCategorySave}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleRenameCategorySave()
+                                  if (e.key === 'Escape') setEditingCategory(null)
+                                }}
+                                className="text-sm font-semibold text-gray-600 uppercase tracking-wider bg-white border border-accent-mint rounded-lg px-2 py-1 outline-none flex-1"
+                                autoFocus
+                              />
                             </div>
-                          </>
+                          ) : (
+                            <div className="flex items-center gap-1 mb-2 px-1 relative">
+                              {/* Category drag handle */}
+                              <button
+                                {...dragAttrs}
+                                {...dragListeners}
+                                className="p-1 -ml-1 rounded-lg text-gray-300 hover:text-gray-500 touch-manipulation cursor-grab active:cursor-grabbing flex-shrink-0"
+                                aria-label="Versleep categorie"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                  <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+                                  <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+                                  <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+                                </svg>
+                              </button>
+
+                              {group.category ? (
+                                <>
+                                  <button
+                                    onClick={() => toggleCollapse(group.category)}
+                                    className="flex items-center gap-2 flex-1 text-left"
+                                  >
+                                    <svg
+                                      className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                                      {group.category}
+                                    </h2>
+                                    {group.totalCount > 0 && (
+                                      <span className="text-xs text-gray-300">
+                                        {group.checkedCount}/{group.totalCount}
+                                      </span>
+                                    )}
+                                  </button>
+
+                                  {/* Category menu button */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setCategoryMenu(categoryMenu === group.category ? null : group.category)
+                                    }}
+                                    className="p-1 rounded-lg hover:bg-white/60 transition-colors"
+                                  >
+                                    <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                      <circle cx="12" cy="6" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="18" r="2" />
+                                    </svg>
+                                  </button>
+
+                                  {/* Category dropdown menu */}
+                                  {categoryMenu === group.category && (
+                                    <>
+                                      <div className="fixed inset-0 z-40" onClick={() => setCategoryMenu(null)} />
+                                      <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 z-50 py-1 min-w-[160px]">
+                                        <button
+                                          onClick={() => startRenameCategory(group.category)}
+                                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        >
+                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                          </svg>
+                                          Hernoemen
+                                        </button>
+                                        <button
+                                          onClick={() => startDeleteCategory(group.category)}
+                                          className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                        >
+                                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                          </svg>
+                                          Verwijderen
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex-1">
+                                  Overig
+                                </h2>
+                              )}
+                            </div>
+                          )
+                        )}
+
+                        {!isCollapsed && (
+                          <DroppableCategory id={droppableId}>
+                            <SortableContext
+                              items={itemIds}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {/* Items */}
+                              {group.items.map(item => (
+                                <SortableItem
+                                  key={item.id}
+                                  item={item}
+                                  listType={list.type}
+                                  onToggle={handleToggleItem}
+                                  onDelete={handleDeleteItem}
+                                  onToTask={handleItemToTask}
+                                  onEdit={handleStartEditItem}
+                                  isEditing={editingItemId === item.id}
+                                  editValue={editItemValue}
+                                  onEditChange={setEditItemValue}
+                                  onEditSave={handleEditItemSave}
+                                />
+                              ))}
+                            </SortableContext>
+
+                            {/* Add item input */}
+                            <div className="flex items-center gap-2 px-1 mt-1">
+                              <input
+                                type="text"
+                                value={newItemText[group.category] || ''}
+                                onChange={e => setNewItemText(prev => ({ ...prev, [group.category]: e.target.value }))}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleAddItem(group.category)
+                                }}
+                                placeholder="Item toevoegen..."
+                                className="flex-1 text-sm bg-transparent border-b border-gray-200 py-1.5 outline-none focus:border-accent-mint text-gray-600 placeholder:text-gray-300 transition-colors"
+                              />
+                              {(newItemText[group.category] || '').trim() && (
+                                <button
+                                  onClick={() => handleAddItem(group.category)}
+                                  className="p-1 rounded-lg text-accent-mint hover:bg-mint-50 transition-colors"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </DroppableCategory>
                         )}
                       </div>
-                    )
-                  ) : displayGroups.length > 1 ? (
-                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">
-                      Overig
-                    </h2>
-                  ) : null}
-
-                  {!isCollapsed && (
-                    <DroppableCategory id={droppableId}>
-                      <SortableContext
-                        items={itemIds}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {/* Items */}
-                        {group.items.map(item => (
-                          <SortableItem
-                            key={item.id}
-                            item={item}
-                            listType={list.type}
-                            onToggle={handleToggleItem}
-                            onDelete={handleDeleteItem}
-                            onToTask={handleItemToTask}
-                            onEdit={handleStartEditItem}
-                            isEditing={editingItemId === item.id}
-                            editValue={editItemValue}
-                            onEditChange={setEditItemValue}
-                            onEditSave={handleEditItemSave}
-                          />
-                        ))}
-                      </SortableContext>
-
-                      {/* Add item input */}
-                      <div className="flex items-center gap-2 px-1 mt-1">
-                        <input
-                          type="text"
-                          value={newItemText[group.category] || ''}
-                          onChange={e => setNewItemText(prev => ({ ...prev, [group.category]: e.target.value }))}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') handleAddItem(group.category)
-                          }}
-                          placeholder="Item toevoegen..."
-                          className="flex-1 text-sm bg-transparent border-b border-gray-200 py-1.5 outline-none focus:border-accent-mint text-gray-600 placeholder:text-gray-300 transition-colors"
-                        />
-                        {(newItemText[group.category] || '').trim() && (
-                          <button
-                            onClick={() => handleAddItem(group.category)}
-                            className="p-1 rounded-lg text-accent-mint hover:bg-mint-50 transition-colors"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </DroppableCategory>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* Add new category */}
-            {addingCategory ? (
-              <div className="flex items-center gap-2 mt-2">
-                <input
-                  type="text"
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleAddCategory()
-                    if (e.key === 'Escape') {
+                    )}
+                  </SortableCategoryRow>
+                )
+              })}
+              {/* Add new category */}
+              {addingCategory ? (
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddCategory()
+                      if (e.key === 'Escape') {
+                        setAddingCategory(false)
+                        setNewCategoryName('')
+                      }
+                    }}
+                    placeholder="Naam categorie..."
+                    className="input-field flex-1"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleAddCategory}
+                    disabled={!newCategoryName.trim()}
+                    className="px-3 py-2 rounded-xl text-sm font-medium bg-accent-mint text-white disabled:opacity-50"
+                  >
+                    Toevoegen
+                  </button>
+                  <button
+                    onClick={() => {
                       setAddingCategory(false)
                       setNewCategoryName('')
-                    }
-                  }}
-                  placeholder="Naam categorie..."
-                  className="input-field flex-1"
-                  autoFocus
-                />
+                    }}
+                    className="px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100"
+                  >
+                    Annuleren
+                  </button>
+                </div>
+              ) : (
                 <button
-                  onClick={handleAddCategory}
-                  disabled={!newCategoryName.trim()}
-                  className="px-3 py-2 rounded-xl text-sm font-medium bg-accent-mint text-white disabled:opacity-50"
+                  onClick={() => setAddingCategory(true)}
+                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 px-1 py-2 transition-colors"
                 >
-                  Toevoegen
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Categorie toevoegen
                 </button>
-                <button
-                  onClick={() => {
-                    setAddingCategory(false)
-                    setNewCategoryName('')
-                  }}
-                  className="px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100"
-                >
-                  Annuleren
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setAddingCategory(true)}
-                className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 px-1 py-2 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Categorie toevoegen
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          </SortableContext>
 
           {/* Drag overlay */}
           <DragOverlay>
-            {activeItem ? <DragOverlayItem item={activeItem} /> : null}
+            {activeItem ? (
+              <DragOverlayItem item={activeItem} />
+            ) : activeCategoryName !== null ? (
+              <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border-2 border-accent-mint shadow-lg opacity-90">
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                  <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+                  <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+                  <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+                </svg>
+                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                  {activeCategoryName || 'Overig'}
+                </span>
+              </div>
+            ) : null}
           </DragOverlay>
         </DndContext>
       </div>

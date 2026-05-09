@@ -105,6 +105,20 @@ export function deleteCategory(req, res) {
   res.json(list)
 }
 
+export function updateCategoryOrder(req, res) {
+  const { order } = req.body
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ error: 'order must be an array' })
+  }
+
+  const existing = listRepo.findById(req.params.id)
+  if (!existing) return res.status(404).json({ error: 'List not found' })
+
+  const list = listRepo.updateCategoryOrder(req.params.id, order)
+  broadcast('lists')
+  res.json(list)
+}
+
 export function reorderItems(req, res) {
   const { items } = req.body
   if (!Array.isArray(items)) {

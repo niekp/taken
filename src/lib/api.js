@@ -389,4 +389,8 @@ export const api = {
     method: 'PUT',
     body: JSON.stringify({ items }),
   }),
+  updateListCategoryOrder: (listId, order) => request(`/lists/${listId}/category-order`, {
+    method: 'PUT',
+    body: JSON.stringify({ order }),
+  }),
 }

@@ -168,8 +168,19 @@ export function removeItem(itemId) {
 }
 
 /**
+ * Update the stored category order for a list.
+ * @param {string} listId
+ * @param {string[]} order - ordered array of category names
+ */
+export function updateCategoryOrder(listId, order) {
+  const db = getDb()
+  db.prepare('UPDATE lists SET category_order = ? WHERE id = ?').run(JSON.stringify(order), listId)
+  return findById(listId)
+}
+
+/**
  * Rename a category: update the category field on all items in a list
- * that belong to the old category.
+ * that belong to the old category. Also updates stored category_order.
  */
 export function renameCategory(listId, oldName, newName) {
   const db = getDb()
@@ -177,11 +188,21 @@ export function renameCategory(listId, oldName, newName) {
     UPDATE list_items SET category = ?
     WHERE list_id = ? AND category = ?
   `).run(newName, listId, oldName)
+
+  const list = db.prepare('SELECT category_order FROM lists WHERE id = ?').get(listId)
+  if (list?.category_order) {
+    try {
+      const order = JSON.parse(list.category_order).map(c => c === oldName ? newName : c)
+      db.prepare('UPDATE lists SET category_order = ? WHERE id = ?').run(JSON.stringify(order), listId)
+    } catch {}
+  }
+
   return findById(listId)
 }
 
 /**
  * Delete a category: either delete all its items or move them to another category.
+ * Also removes the category from stored category_order.
  */
 export function deleteCategory(listId, category, moveTo) {
   const db = getDb()
@@ -210,6 +231,15 @@ export function deleteCategory(listId, category, moveTo) {
     // Delete all items in the category
     db.prepare('DELETE FROM list_items WHERE list_id = ? AND category = ?').run(listId, category)
   }
+
+  const list = db.prepare('SELECT category_order FROM lists WHERE id = ?').get(listId)
+  if (list?.category_order) {
+    try {
+      const order = JSON.parse(list.category_order).filter(c => c !== category)
+      db.prepare('UPDATE lists SET category_order = ? WHERE id = ?').run(JSON.stringify(order), listId)
+    } catch {}
+  }
+
   return findById(listId)
 }
 
