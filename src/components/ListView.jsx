@@ -247,7 +247,7 @@ export default function ListView({ listId, currentUser, users, onBack }) {
     activationConstraint: { distance: 5 },
   })
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 200, tolerance: 8 },
+    activationConstraint: { delay: 200, tolerance: 12 },
   })
   const sensors = useSensors(pointerSensor, touchSensor)
 
@@ -889,7 +889,7 @@ export default function ListView({ listId, currentUser, users, onBack }) {
                               <button
                                 {...dragAttrs}
                                 {...dragListeners}
-                                className="p-1 -ml-1 rounded-lg text-gray-300 hover:text-gray-500 touch-manipulation cursor-grab active:cursor-grabbing flex-shrink-0"
+                                className="p-1 -ml-1 rounded-lg text-gray-300 hover:text-gray-500 touch-none cursor-grab active:cursor-grabbing flex-shrink-0"
                                 aria-label="Versleep categorie"
                               >
                                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
