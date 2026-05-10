@@ -83,7 +83,7 @@ function SortableItem({ item, listType, onToggle, onDelete, onToTask, onEdit, is
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 bg-white rounded-xl px-3 py-2.5 border border-gray-100 group touch-manipulation"
+      className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-gray-100 group touch-manipulation"
     >
       {/* Drag handle */}
       <button
@@ -123,13 +123,13 @@ function SortableItem({ item, listType, onToggle, onDelete, onToTask, onEdit, is
             if (e.key === 'Enter') onEditSave()
             if (e.key === 'Escape') onEditSave()
           }}
-          className="flex-1 text-sm bg-transparent border-b-2 border-accent-mint outline-none text-gray-700 py-0"
+          className="flex-1 text-[15px] bg-transparent border-b-2 border-accent-mint outline-none text-gray-700 py-0"
           autoFocus
           onClick={e => e.stopPropagation()}
         />
       ) : (
         <span
-          className={`flex-1 text-sm cursor-pointer ${
+          className={`flex-1 text-[15px] cursor-pointer ${
             item.checked ? 'text-gray-400 line-through' : 'text-gray-700'
           }`}
           onClick={() => onEdit(item)}
@@ -413,6 +413,29 @@ export default function ListView({ listId, currentUser, users, onBack }) {
       if (isMutationQueued(err)) toast.info('Wordt gesynchroniseerd wanneer online')
       else toast.error('Bewerken mislukt')
     }
+  }
+
+  function handleExport() {
+    const lines = []
+    for (const group of displayGroups) {
+      if (group.items.length === 0) continue
+      if (group.category) {
+        lines.push(`## ${group.category}`)
+        lines.push('')
+      }
+      for (const item of group.items) {
+        lines.push(`- [${item.checked ? 'x' : ' '}] ${item.title}`)
+      }
+      lines.push('')
+    }
+    const markdown = lines.join('\n').trimEnd() + '\n'
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${list.title}.md`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   async function handleAddCategory() {
@@ -792,6 +815,15 @@ export default function ListView({ listId, currentUser, users, onBack }) {
           </div>
           
           <div className="flex items-center gap-1">
+            <button
+              onClick={handleExport}
+              className="p-2.5 rounded-xl hover:bg-white/60 transition-colors"
+              title="Exporteren als markdown"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </button>
             {list.type === 'packing' && (
               <button
                 onClick={() => setShowImport(true)}
