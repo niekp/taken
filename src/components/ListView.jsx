@@ -963,28 +963,49 @@ export default function ListView({ listId, currentUser, users, onBack }) {
                             </SortableContext>
 
                             {/* Add item input */}
-                            <div className="flex items-center gap-2 px-1 mt-1">
-                              <input
-                                type="text"
-                                value={newItemText[group.category] || ''}
-                                onChange={e => setNewItemText(prev => ({ ...prev, [group.category]: e.target.value }))}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') handleAddItem(group.category)
-                                }}
-                                placeholder="Item toevoegen..."
-                                className="flex-1 text-sm bg-transparent border-b border-gray-200 py-1.5 outline-none focus:border-accent-mint text-gray-600 placeholder:text-gray-300 transition-colors"
-                              />
-                              {(newItemText[group.category] || '').trim() && (
-                                <button
-                                  onClick={() => handleAddItem(group.category)}
-                                  className="p-1 rounded-lg text-accent-mint hover:bg-mint-50 transition-colors"
-                                >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
+                            {(() => {
+                              const inputText = (newItemText[group.category] || '').trim()
+                              const duplicateMatch = inputText.length >= 2
+                                ? currentItems.find(i => i.title.toLowerCase().includes(inputText.toLowerCase()))
+                                : null
+                              return (
+                                <>
+                                  <div className="flex items-center gap-2 px-1 mt-1">
+                                    <input
+                                      type="text"
+                                      value={newItemText[group.category] || ''}
+                                      onChange={e => setNewItemText(prev => ({ ...prev, [group.category]: e.target.value }))}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter') handleAddItem(group.category)
+                                      }}
+                                      placeholder="Item toevoegen..."
+                                      className="flex-1 text-sm bg-transparent border-b border-gray-200 py-1.5 outline-none focus:border-accent-mint text-gray-600 placeholder:text-gray-300 transition-colors"
+                                    />
+                                    {inputText && (
+                                      <button
+                                        onClick={() => handleAddItem(group.category)}
+                                        className="p-1 rounded-lg text-accent-mint hover:bg-mint-50 transition-colors"
+                                      >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                  {duplicateMatch && (
+                                    <div className="flex items-center gap-1.5 px-1 mt-0.5">
+                                      <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
+                                        <circle cx="12" cy="12" r="10" strokeWidth={1.5} />
+                                      </svg>
+                                      <p className="text-xs text-amber-500">
+                                        <span className="font-medium">"{duplicateMatch.title}"</span> staat al op de lijst
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )
+                            })()}
                           </DroppableCategory>
                         )}
                       </div>
