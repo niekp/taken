@@ -9,12 +9,16 @@ export function findByDateRange(from, to) {
 
 export function create({ date, meal_name }) {
   const db = getDb()
-  const id = generateId()
-  db.prepare(`
-    INSERT INTO meals (id, date, meal_name)
-    VALUES (?, ?, ?)
-  `).run(id, date, meal_name)
-  return db.prepare('SELECT * FROM meals WHERE id = ?').get(id)
+  return db.transaction(() => {
+    const existing = db.prepare('SELECT id FROM meals WHERE date = ?').get(date)
+    if (existing) {
+      db.prepare('UPDATE meals SET meal_name = ? WHERE id = ?').run(meal_name, existing.id)
+      return db.prepare('SELECT * FROM meals WHERE id = ?').get(existing.id)
+    }
+    const id = generateId()
+    db.prepare('INSERT INTO meals (id, date, meal_name) VALUES (?, ?, ?)').run(id, date, meal_name)
+    return db.prepare('SELECT * FROM meals WHERE id = ?').get(id)
+  })()
 }
 
 export function update(id, { meal_name }) {
