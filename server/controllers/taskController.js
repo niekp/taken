@@ -49,6 +49,16 @@ export function postpone(req, res) {
   res.json(task)
 }
 
+export function setPriority(req, res) {
+  const existing = taskRepo.findById(req.params.id)
+  if (!existing) return res.status(404).json({ error: 'Task not found' })
+  if (existing.completed_at) return res.status(400).json({ error: 'Cannot prioritize a completed task' })
+
+  const task = taskRepo.setPriority(req.params.id, req.body?.priority)
+  broadcast('tasks')
+  res.json(task)
+}
+
 export function remove(req, res) {
   const deleted = taskRepo.remove(req.params.id)
   if (!deleted) return res.status(404).json({ error: 'Task not found (or is a scheduled task)' })

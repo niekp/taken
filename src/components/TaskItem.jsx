@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { getUserColor, BOTH_COLOR } from '../lib/colors'
 
-export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDelete, onDeleteAttempt, onPostpone, users, isToday, compact, resetKey, showCategory }) {
+export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDelete, onDeleteAttempt, onPostpone, onTogglePriority, users, isToday, compact, resetKey, showCategory }) {
   const isCompleted = !!task.completed_at
   const isGhost = !!task.is_ghost
   const isPendingSync = !!task.is_pending_sync
+  const isPrio = !!task.priority && !isCompleted && !isGhost
 
   const assignedUser = users.find(u => u.id === task.assigned_to)
   const completedByUser = users.find(u => u.id === task.completed_by)
@@ -175,6 +176,11 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
 
         <div className="flex-1 min-w-0">
           <p className={`font-medium text-sm leading-tight whitespace-normal ${isCompleted ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+            {isPrio && (
+              <svg className="inline-block w-3 h-3 mr-1 -mt-0.5 text-accent-peach" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 21v-4V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
+              </svg>
+            )}
             {task.title}
           </p>
           {showCategory && task.category && (
@@ -189,6 +195,17 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
         {/* Desktop hover actions for compact view */}
         {!isCompleted && !isGhost && (
           <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            {onTogglePriority && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onTogglePriority() }}
+                className={`p-1 rounded-md transition-colors ${isPrio ? 'text-accent-peach hover:bg-pastel-peach/30' : 'text-gray-400 hover:text-accent-peach hover:bg-pastel-peach/20'}`}
+                title={isPrio ? 'Prioriteit verwijderen' : 'Prioriteit geven'}
+              >
+                <svg className="w-3.5 h-3.5" fill={isPrio ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
+                </svg>
+              </button>
+            )}
             {onPostpone && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPostpone() }}
@@ -310,7 +327,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
           transition: isDragging ? 'none' : 'transform 0.3s ease-out'
         }}
       >
-        <div className="flex items-start gap-2.5 px-3 py-2 rounded-xl">
+        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl">
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -322,7 +339,7 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
                 onComplete()
               }
             }}
-            className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
+            className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
               isPendingSync && isCompleted
                 ? 'bg-accent-mint/50 border-accent-mint/50'
                 : isCompleted
@@ -339,44 +356,67 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
 
           <div className="flex-1 min-w-0">
             <p className={`font-medium text-sm truncate transition-all ${isCompleted ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+              {isPrio && (
+                <svg className="inline-block w-3.5 h-3.5 mr-1 -mt-0.5 text-accent-peach" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 21v-4V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
+                </svg>
+              )}
               {task.title}
             </p>
-            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-              {!task.is_both && (
-                <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-md font-medium ${config.bgLight} ${config.text}`}>
-                  {assigneeAvatar ? (
-                    <img src={assigneeAvatar} alt={assignee} className="w-3.5 h-3.5 rounded-full object-cover mr-1" />
-                  ) : null}
-                  {assignee}
-                </span>
-              )}
-              {task.schedule_id && (
-                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-100 text-gray-400">
-                  <svg className="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  {task.interval_days}d
-                </span>
-              )}
-              {showCategory && task.category && (
-                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-50 text-gray-400">
-                  {task.category}
-                </span>
-              )}
-              {isCompleted && completedByUser && (
-                <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-green-50 text-green-600">
-                  {completedByUser.name}
-                </span>
-              )}
-              {syncBadge}
-            </div>
+            {(task.schedule_id || (showCategory && task.category) || (isCompleted && completedByUser) || syncBadge) && (
+              <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                {task.schedule_id && (
+                  <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-100 text-gray-400">
+                    <svg className="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {task.interval_days}d
+                  </span>
+                )}
+                {showCategory && task.category && (
+                  <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-50 text-gray-400">
+                    {task.category}
+                  </span>
+                )}
+                {isCompleted && completedByUser && (
+                  <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium bg-green-50 text-green-600">
+                    {completedByUser.name}
+                  </span>
+                )}
+                {syncBadge}
+              </div>
+            )}
             {task.notes && !isCompleted && (
               <p className="text-xs text-gray-400 mt-0.5 truncate">{task.notes}</p>
             )}
           </div>
 
+          {/* Mobile-only always-visible priority toggle */}
+          {!isCompleted && !isPendingSync && onTogglePriority && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onTogglePriority() }}
+              className={`md:hidden p-1.5 -mr-1 rounded-md flex-shrink-0 transition-colors ${isPrio ? 'text-accent-peach' : 'text-gray-300'}`}
+              title={isPrio ? 'Prioriteit verwijderen' : 'Prioriteit geven'}
+            >
+              <svg className="w-4 h-4" fill={isPrio ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
+              </svg>
+            </button>
+          )}
+
           {!isCompleted && !isPendingSync && (
             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+              {onTogglePriority && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onTogglePriority() }}
+                  className={`p-1 rounded-md transition-colors ${isPrio ? 'text-accent-peach hover:bg-pastel-peach/30' : 'text-gray-400 hover:text-accent-peach hover:bg-pastel-peach/20'}`}
+                  title={isPrio ? 'Prioriteit verwijderen' : 'Prioriteit geven'}
+                >
+                  <svg className="w-4 h-4" fill={isPrio ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
+                  </svg>
+                </button>
+              )}
               {onPostpone && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onPostpone() }}
@@ -409,6 +449,14 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
+              )}
+            </div>
+          )}
+
+          {!task.is_both && !isCompleted && (
+            <div className={`w-3 h-3 rounded-full flex-shrink-0 ${config.dot}`} title={assignee}>
+              {assigneeAvatar && (
+                <img src={assigneeAvatar} alt={assignee} className="w-full h-full rounded-full object-cover" />
               )}
             </div>
           )}

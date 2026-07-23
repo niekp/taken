@@ -187,6 +187,11 @@ export const api = {
     ...(date ? { body: JSON.stringify({ date }) } : {}),
   }),
 
+  setTaskPriority: (id, priority) => request(`/tasks/${id}/priority`, {
+    method: 'POST',
+    body: JSON.stringify({ priority: priority ? 1 : 0 }),
+  }),
+
   deleteTask: (id) => request(`/tasks/${id}`, {
     method: 'DELETE',
   }),

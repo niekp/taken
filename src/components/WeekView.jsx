@@ -273,12 +273,15 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
         categoryMap.get(cat).push(task)
       }
     }
+    // Prio tasks float to the top within their category group (stable sort
+    // keeps ghosts and same-priority tasks in their original order)
+    const byPriority = (a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0)
     const taskGroups = []
     if (uncategorized.length > 0) {
-      taskGroups.push({ category: null, items: uncategorized })
+      taskGroups.push({ category: null, items: uncategorized.sort(byPriority) })
     }
     for (const [category, catItems] of categoryMap) {
-      taskGroups.push({ category, items: catItems })
+      taskGroups.push({ category, items: catItems.sort(byPriority) })
     }
 
     return { tasks: dayTasks, ghosts: dayGhosts, taskGroups, completedTasks }
@@ -366,6 +369,22 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
 
   async function handlePostponeTask(task) {
     setPostponeTarget(task)
+  }
+
+  async function handleTogglePriority(task) {
+    const next = task.priority ? 0 : 1
+    try {
+      await api.setTaskPriority(task.id, next)
+      loadData()
+    } catch (err) {
+      console.error('Failed to set priority:', err)
+      if (isMutationQueued(err)) {
+        setPendingEdits(prev => new Map([...prev, [task.id, { ...(prev.get(task.id) || {}), priority: next }]]))
+        toast.info('Wordt gesynchroniseerd wanneer online')
+      } else {
+        toast.error('Prioriteit wijzigen mislukt')
+      }
+    }
   }
 
   async function handlePostponeToDate(task, date) {
@@ -718,6 +737,7 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
                         onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
                         onDeleteAttempt={() => setResetKey(k => k + 1)}
                         onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
+                        onTogglePriority={!task.completed_at ? () => handleTogglePriority(task) : undefined}
                         users={users}
                         isToday={isToday}
                         compact
@@ -836,6 +856,7 @@ export default function WeekView({ currentUser, users, onComplete, onOpenMenu })
                         onDelete={!task.schedule_id ? () => handleDeleteTask(task) : undefined}
                         onDeleteAttempt={() => setResetKey(k => k + 1)}
                         onPostpone={!task.completed_at ? () => handlePostponeTask(task) : undefined}
+                        onTogglePriority={!task.completed_at ? () => handleTogglePriority(task) : undefined}
                         users={users}
                         isToday={isToday}
                         resetKey={resetKey}

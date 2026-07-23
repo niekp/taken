@@ -30,7 +30,7 @@ export function findByDateRange(from, to) {
     LEFT JOIN users cu ON t.completed_by = cu.id
     LEFT JOIN schedules s ON t.schedule_id = s.id
     WHERE t.date BETWEEN ? AND ?
-    ORDER BY t.date ASC, t.created_at ASC
+    ORDER BY t.date ASC, t.priority DESC, t.created_at ASC
   `).all(from, to)
   return tasks.map(toBooleans)
 }
@@ -108,6 +108,20 @@ export function reassign(id, { assigned_to, is_both, notes }) {
       WHERE id = ? AND completed_at IS NULL
     `).run(assigned_to || null, is_both ? 1 : 0, id)
   }
+  return findById(id)
+}
+
+/**
+ * Set a task's priority (0 = normal, 1 = prio). Only uncompleted tasks.
+ * Works for both scheduled and one-off tasks. Does not carry over to the
+ * next generated occurrence.
+ */
+export function setPriority(id, priority) {
+  const db = getDb()
+  db.prepare(`
+    UPDATE tasks SET priority = ?
+    WHERE id = ? AND completed_at IS NULL
+  `).run(priority ? 1 : 0, id)
   return findById(id)
 }
 
@@ -272,6 +286,7 @@ export function getGhostTasks(from, to) {
         is_ghost: true,
         interval_days: task.interval_days,
         category: task.category,
+        priority: 0,
       })
     }
   }
