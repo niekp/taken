@@ -356,11 +356,6 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
 
           <div className="flex-1 min-w-0">
             <p className={`font-medium text-sm truncate transition-all ${isCompleted ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-              {isPrio && (
-                <svg className="inline-block w-3.5 h-3.5 mr-1 -mt-0.5 text-accent-peach" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M3 21v-4V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
-                </svg>
-              )}
               {task.title}
             </p>
             {(task.schedule_id || (showCategory && task.category) || (isCompleted && completedByUser) || syncBadge) && (
@@ -391,32 +386,8 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
             )}
           </div>
 
-          {/* Mobile-only always-visible priority toggle */}
-          {!isCompleted && !isPendingSync && onTogglePriority && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onTogglePriority() }}
-              className={`md:hidden p-1.5 -mr-1 rounded-md flex-shrink-0 transition-colors ${isPrio ? 'text-accent-peach' : 'text-gray-300'}`}
-              title={isPrio ? 'Prioriteit verwijderen' : 'Prioriteit geven'}
-            >
-              <svg className="w-4 h-4" fill={isPrio ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
-              </svg>
-            </button>
-          )}
-
           {!isCompleted && !isPendingSync && (
             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-              {onTogglePriority && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onTogglePriority() }}
-                  className={`p-1 rounded-md transition-colors ${isPrio ? 'text-accent-peach hover:bg-pastel-peach/30' : 'text-gray-400 hover:text-accent-peach hover:bg-pastel-peach/20'}`}
-                  title={isPrio ? 'Prioriteit verwijderen' : 'Prioriteit geven'}
-                >
-                  <svg className="w-4 h-4" fill={isPrio ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
-                  </svg>
-                </button>
-              )}
               {onPostpone && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onPostpone() }}
@@ -459,6 +430,18 @@ export default function TaskItem({ task, onComplete, onUncomplete, onEdit, onDel
                 <img src={assigneeAvatar} alt={assignee} className="w-full h-full rounded-full object-cover" />
               )}
             </div>
+          )}
+
+          {!isCompleted && !isPendingSync && onTogglePriority && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onTogglePriority() }}
+              className={`p-1.5 -mr-1 rounded-md flex-shrink-0 transition-colors ${isPrio ? 'text-accent-peach' : 'text-gray-300 hover:text-accent-peach'}`}
+              title={isPrio ? 'Prioriteit verwijderen' : 'Prioriteit geven'}
+            >
+              <svg className="w-4 h-4" fill={isPrio ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h9l-1 4h6l-3 4 3 4h-9a2 2 0 00-2 2H3z" />
+              </svg>
+            </button>
           )}
         </div>
       </div>
