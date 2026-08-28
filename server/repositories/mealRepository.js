@@ -48,3 +48,18 @@ export function recentNames(days = 30) {
     ORDER BY MAX(date) DESC
   `).all(sinceStr).map(r => r.meal_name)
 }
+
+export function history({ before = null, limit = 60 } = {}) {
+  const db = getDb()
+  const today = formatDateLocal(new Date())
+  const until = before && before < today ? before : today
+  return db.prepare(`
+    SELECT m.id, m.date, m.meal_name,
+      (SELECT COUNT(*) FROM meals c
+        WHERE c.meal_name = m.meal_name COLLATE NOCASE AND c.date < ?) AS times_eaten
+    FROM meals m
+    WHERE m.date < ?
+    ORDER BY m.date DESC, m.id DESC
+    LIMIT ?
+  `).all(today, until, limit)
+}

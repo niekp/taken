@@ -5,6 +5,7 @@ import Login from './components/Login'
 import WeekView from './components/WeekView'
 import SchedulesView from './components/SchedulesView'
 import MealsView from './components/MealsView'
+import MealHistoryView from './components/MealHistoryView'
 import GroceryView from './components/GroceryView'
 import DagschemaView from './components/DagschemaView'
 import FutureView from './components/FutureView'
@@ -34,6 +35,7 @@ export default function App() {
     } catch { return null }
   })
   const [showMealsFromGrocery, setShowMealsFromGrocery] = useState(false)
+  const [showMealHistory, setShowMealHistory] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showUserManagement, setShowUserManagement] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -44,6 +46,16 @@ export default function App() {
   const [swWaiting, setSwWaiting] = useState(null) // waiting SW registration
   // Temporarily hold PIN during multi-user selection flow
   const pendingPinRef = useRef(null)
+
+  function openMeals() {
+    setShowMealsFromGrocery(true)
+    setShowMealHistory(false)
+  }
+
+  function closeMeals() {
+    setShowMealsFromGrocery(false)
+    setShowMealHistory(false)
+  }
 
   // Register onUnauthorized callback — force logout on 401
   useEffect(() => {
@@ -289,15 +301,20 @@ export default function App() {
         />
       ) : view === 'grocery' ? (
         showMealsFromGrocery ? (
-          <MealsView
-            users={users}
-            onOpenMenu={() => setShowMenu(true)}
-            onBack={() => setShowMealsFromGrocery(false)}
-          />
+          showMealHistory ? (
+            <MealHistoryView onBack={() => setShowMealHistory(false)} />
+          ) : (
+            <MealsView
+              users={users}
+              onOpenMenu={() => setShowMenu(true)}
+              onBack={closeMeals}
+              onOpenHistory={() => setShowMealHistory(true)}
+            />
+          )
         ) : (
           <GroceryView
             onOpenMenu={() => setShowMenu(true)}
-            onOpenMeals={() => setShowMealsFromGrocery(true)}
+            onOpenMeals={openMeals}
           />
         )
       ) : view === 'future' ? (
@@ -340,7 +357,7 @@ export default function App() {
       <div className="fixed bottom-0 left-0 right-0 z-30 glass border-t border-gray-200">
         <div className="flex">
           <button
-            onClick={() => { setView('weekly'); setShowMealsFromGrocery(false) }}
+            onClick={() => { setView('weekly'); closeMeals() }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'weekly' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -352,7 +369,7 @@ export default function App() {
           </button>
           {bringEnabled && (
             <button
-              onClick={() => { setView('grocery'); setShowMealsFromGrocery(false) }}
+              onClick={() => { setView('grocery'); closeMeals() }}
               className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
                 view === 'grocery' ? 'text-accent-mint' : 'text-gray-400'
               }`}
@@ -364,7 +381,7 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={() => { setView('future'); setShowMealsFromGrocery(false) }}
+            onClick={() => { setView('future'); closeMeals() }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'future' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -375,7 +392,7 @@ export default function App() {
             <span className="text-xs font-medium">Toekomst</span>
           </button>
           <button
-            onClick={() => { setView('lists'); setShowMealsFromGrocery(false) }}
+            onClick={() => { setView('lists'); closeMeals() }}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
               view === 'lists' ? 'text-accent-mint' : 'text-gray-400'
             }`}
@@ -409,7 +426,7 @@ export default function App() {
           onOpenMeals={() => {
             setShowMenu(false)
             setView('grocery')
-            setShowMealsFromGrocery(true)
+            openMeals()
           }}
           onOpenUserManagement={() => {
             setShowMenu(false)

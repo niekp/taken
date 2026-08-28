@@ -215,6 +215,14 @@ export const api = {
 
   getMealSuggestions: () => request('/meals/suggestions'),
 
+  getMealHistory: ({ before, limit } = {}) => {
+    const params = new URLSearchParams()
+    if (before) params.set('before', before)
+    if (limit) params.set('limit', limit)
+    const query = params.toString()
+    return request(`/meals/history${query ? `?${query}` : ''}`)
+  },
+
   createMeal: (meal) => request('/meals', {
     method: 'POST',
     body: JSON.stringify(meal),

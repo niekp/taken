@@ -63,6 +63,7 @@ router.post('/tasks/:id/uncomplete', taskController.uncomplete)
 
 // Meals (static routes before parameterized)
 router.get('/meals/suggestions', mealController.suggestions)
+router.get('/meals/history', mealController.history)
 router.get('/meals', mealController.list)
 router.post('/meals', mealController.create)
 router.put('/meals/:id', mealController.update)

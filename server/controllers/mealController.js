@@ -1,6 +1,10 @@
 import * as mealRepo from '../repositories/mealRepository.js'
 import { broadcast } from '../lib/liveSync.js'
 
+const DEFAULT_HISTORY_LIMIT = 60
+const MAX_HISTORY_LIMIT = 200
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
 export function list(req, res) {
   const { from, to } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from and to are required' })
@@ -33,4 +37,18 @@ export function remove(req, res) {
 
 export function suggestions(req, res) {
   res.json(mealRepo.recentNames())
+}
+
+export function history(req, res) {
+  const { before, limit } = req.query
+  if (before && !DATE_PATTERN.test(before)) {
+    return res.status(400).json({ error: 'before must be a YYYY-MM-DD date' })
+  }
+
+  const parsedLimit = limit === undefined ? DEFAULT_HISTORY_LIMIT : Number(limit)
+  if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > MAX_HISTORY_LIMIT) {
+    return res.status(400).json({ error: `limit must be an integer between 1 and ${MAX_HISTORY_LIMIT}` })
+  }
+
+  res.json(mealRepo.history({ before, limit: parsedLimit }))
 }

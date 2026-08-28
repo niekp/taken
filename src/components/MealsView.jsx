@@ -26,7 +26,7 @@ function getDays() {
   return days
 }
 
-export default function MealsView({ users, onOpenMenu, onBack }) {
+export default function MealsView({ users, onOpenMenu, onBack, onOpenHistory }) {
   const [meals, setMeals] = useState([])
   const [dailyEntries, setDailyEntries] = useState({})
   const [dayStatuses, setDayStatuses] = useState({})
@@ -259,8 +259,15 @@ export default function MealsView({ users, onOpenMenu, onBack }) {
             <p className="text-gray-400 text-xs">Komende 7 dagen</p>
           </div>
 
-          {/* Spacer to balance the hamburger */}
-          <div className="w-10" />
+          <button
+            onClick={onOpenHistory}
+            title="Geschiedenis"
+            className="p-2.5 rounded-xl hover:bg-white/60 transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
         </div>
       </div>
 
